@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-25",
+  "vitest": {
+    "files": 12,
+    "passed": 291,
+    "failed": 0
+  },
+  "arcade_browser": {
+    "full_groups": 19,
+    "new_touch_guard_groups": 1,
+    "failed": 0,
+    "unexpected_errors": 0,
+    "full_report": "arcade-final-full-report.json",
+    "guard_report": "arcade-touch-guard-report.json"
+  },
+  "pacman_browser": {
+    "gameplay": 23,
+    "fullscreen": 15,
+    "graphics_including_production": 14,
+    "experience_including_production": 17,
+    "experience_assertions": 1320,
+    "failed": 0,
+    "unexpected_errors": 0
+  },
+  "setup": {
+    "npm_ci": "passed,114 packages",
+    "local_migrations": "applied,then repeated with none pending",
+    "restarted_worker": "healthy; previous accepted score retained",
+    "typecheck_build": "passed"
+  },
+  "runtime": {
+    "browser": "headless Chromium154.0.8037.57",
+    "graphics": "ANGLE/Vulkan SwiftShader software renderer",
+    "mobile": "DPR2 viewport/touch emulation; no physical phone",
+    "node": "24.19.0",
+    "wrangler": "4.152.0"
+  },
+  "published": false,
+  "google_sign_in": "unavailable; guest initials implemented, no accounts claimed",
+  "limits": [
+    "Replay checking does not prove human play or prevent tool-assisted legal inputs.",
+    "Provider CPU/D1 quotas and hardware GPU/mobile performance are not certified.",
+    "Full19 arcade groups preceded the final shared touch guard; the new guard regression and full17 classic experience suite verified that final input change."
+  ],
+  "artifacts": {
+    "build/worker.mjs": {
+      "bytes": 65110,
+      "sha256": "c81592cf58ceb42c58a34722cfdc21f35a5cf7aa4beabbd67b64778e607ce90b"
+    },
+    "dist/index.html": {
+      "bytes": 23268,
+      "sha256": "5c5b8d8bb9e583470580b08fb621e242b3719ff6aa89a1001d94dbf623901afd"
+    },
+    "dist/pacman.html": {
+      "bytes": 120566,
+      "sha256": "4d8f3080f6b964214d3dac65f1e2b7ee88232cf62ba7bd2fdfe9c3a806a1d637"
+    },
+    "dist/THIRD_PARTY_NOTICES.txt": {
+      "bytes": 1310,
+      "sha256": "f01f3c53a698c4dce31374543c06418af8ac65d0a4cbc5ebaff4d43933c361c1"
+    }
+  },
+  "migrations": {
+    "0000_initial_leaderboards.sql": "c6f9ca90e71b4b814e5b8c3e70ee10c1dbece00176418fdcc1f992f248c4e8dd",
+    "0001_recoverable_claims_and_pending_expiry.sql": "f3009c5f61c05f761eeea92e2f31dcfca8770724e460696c83a3ff9d606c463c"
+  },
+  "screenshots": [
+    "home-desktop.png",
+    "home-mobile.png",
+    "neon-rally-mobile.png",
+    "reactor-breaker-mobile.png",
+    "chrome-siege-desktop.png",
+    "midnight-pinball-mobile.png",
+    "pacman-desktop.png",
+    "global-score-local-validation.png"
+  ]
+}

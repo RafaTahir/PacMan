@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "after-hours-arcade",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "after-hours-leaderboards",
+      // Local development uses this binding; Sites injects its provisioned DB
+      // for project appgprj_6add9f91d5088191b2397efdda9c3663. Never deploy a
+      // placeholder database ID to a standalone Cloudflare account.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}
