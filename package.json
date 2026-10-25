@@ -12,7 +12,9 @@
     "dev:api": "wrangler dev --ip 127.0.0.1 --port 8787 --persist-to .wrangler/state",
     "db:migrate:local": "wrangler d1 migrations apply after-hours-leaderboards --local --persist-to .wrangler/state",
     "db:generate": "drizzle-kit generate",
-    "test:arcade": "vitest run tests/*rally* tests/*breaker* tests/*siege* tests/*pinball* tests/arcade-runtime.test.ts tests/leaderboard*.test.ts"
+    "test:arcade": "vitest run tests/*rally* tests/*breaker* tests/*siege* tests/*pinball* tests/arcade-runtime.test.ts tests/leaderboard*.test.ts",
+    "build:sites": "npm run build && node scripts/package-sites.mjs",
+    "test:sites": "vitest run tests/sites-assets.test.ts && node scripts/smoke-sites.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

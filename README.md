@@ -99,3 +99,9 @@ The coordinating Sites publisher owns the supported adapter, existing project/au
 Pac-Man remains an independent fan tribute with documented arcade differences. New games use original procedural art, geometry and synthesized audio, without model packs or protected game assets.
 
 Runtime framework attribution: [Third-party notices](THIRD_PARTY_NOTICES.md), also distributed as `dist/THIRD_PARTY_NOTICES.txt`.
+
+## Standalone Sites Worker package
+
+Run `npm run build:sites`, then `npm run test:sites`. The package entry is `dist-sites/server/index.js`: one Worker ESM containing all static `dist/` assets and the existing API. It supplies `ASSETS.fetch` internally, so Sites needs only its provisioned `DB` binding, not a separate static-assets binding. MIME/byte lengths, GET/HEAD, ETag/cache headers, byte ranges, SPA navigation and missing-file statuses are preserved; API responses and database bindings pass through unchanged.
+
+The package also copies the immutable `drizzle/` SQL/snapshots/journal and `.openai/hosting.json` byte-for-byte. The Worker hosting manifest keeps the existing project ID, `d1:"DB"`, and `r2:null`, without obsolete `static_dir`. Apply pending schema migrations before uploading this packaged Worker through the official Sites WorkerESM workflow. The packaging step does not publish or migrate a remote database.
