@@ -23,7 +23,7 @@ API_URL = os.environ.get("ARCADE_API_URL")
 CHECK_PATTERN = os.environ.get("ARCADE_CHECK_PATTERN")
 OUT = Path(__file__).resolve().parents[1] / "test-results"
 OUT.mkdir(exist_ok=True)
-GAMES = ["neon-rally", "reactor-breaker", "chrome-siege", "midnight-pinball"]
+GAMES = ["neon-rally", "reactor-breaker", "chrome-siege", "midnight-pinball", "orbit-salvage", "tidal-courier", "prism-circuit", "skybound-stack", "canopy-sprint"]
 report = {"checks": [], "errors": [], "warnings": [], "layouts": [], "screenshots": [], "gpu": [],
           "environment": {"url": URL, "productionUrl": PRODUCTION_URL, "apiUrl": API_URL,
                           "platform": platform.platform(), "headless": True, "launchArgs": ["--no-sandbox"], "checkPattern": CHECK_PATTERN},
@@ -264,6 +264,38 @@ def demonstrate(page, game):
         require(len(app(page)["state"]["bullets"]) > 0, "Fire creates actual simulated projectiles")
         hold_key(page, "Shift", 100)
         require(app(page)["state"]["player"]["dashCooldown"] > 0, "Dash starts its simulation cooldown")
+    elif game == "orbit-salvage":
+        hold_key(page, "ArrowRight", 250)
+        require(app(page)["state"]["player"]["x"] > before["player"]["x"] + .1, "Thrust accelerates actual spaceship")
+        hold_key(page, "Space", 180)
+        require(len(app(page)["state"]["shots"]) > 0, "Cannon creates actual projectiles")
+    elif game == "tidal-courier":
+        page.keyboard.down("ArrowRight")
+        hold_key(page, "Space", 350)
+        page.keyboard.up("ArrowRight")
+        after = app(page)["state"]
+        require(after["player"]["x"] > before["player"]["x"] + .1, "Steering moves actual courier boat")
+        require(after["player"]["fuel"] < 98, "Boat boost spends fuel")
+    elif game == "prism-circuit":
+        hold_key(page, "ArrowRight", 70)
+        after = app(page)["state"]
+        require(after["selected"] != before["selected"], "Keyboard selects a circuit tile")
+        selected = after["selected"]; rotation = after["tiles"][selected]["rotation"]
+        hold_key(page, "Space", 60)
+        require(app(page)["state"]["tiles"][selected]["rotation"] == (rotation + 1) % 4, "Rotate changes actual circuit")
+        hold_key(page, "Shift", 60)
+        require(app(page)["state"]["tiles"][selected]["rotation"] == rotation, "Undo restores circuit rotation")
+    elif game == "skybound-stack":
+        hold_key(page, "ArrowRight", 100)
+        require(app(page)["state"]["piece"]["x"] > before["piece"]["x"], "Keyboard moves the falling shape")
+        pieces = app(page)["state"]["pieces"]
+        hold_key(page, "Shift", 80)
+        require(app(page)["state"]["pieces"] > pieces, "Hard drop locks an actual shape")
+    elif game == "canopy-sprint":
+        hold_key(page, "ArrowLeft", 90)
+        require(app(page)["state"]["lane"] == 0, "Keyboard changes runner lane")
+        hold_key(page, "Space", 180)
+        require(app(page)["state"]["height"] > .4, "Jump lifts actual runner")
     else:
         hold_key(page, "Space", 600)
         page.wait_for_timeout(200)
@@ -322,6 +354,30 @@ def demonstrate_touch(page, game):
         require(len(held["bullets"]) > 0 and held["player"]["aimY"] < 0, "The actual right touch stick aims and fires projectiles")
         touch_control(page, "#touch-secondary", duration=100)
         require(app(page)["state"]["player"]["dashCooldown"] > 0, "Touch dash triggers the actual cooldown")
+    elif game == "orbit-salvage":
+        touch_control(page, '[data-stick="move"]', dx=24, duration=250)
+        require(app(page)["state"]["player"]["x"] > before["player"]["x"] + .1, "Touch thrust moves the spaceship")
+        held = touch_control(page, '[data-stick="aim"]', dy=-24, duration=180, during=lambda: app(page)["state"])
+        require(len(held["shots"]) > 0, "Touch aim fires cannon")
+    elif game == "tidal-courier":
+        touch_control(page, '[data-stick="move"]', dx=24, duration=350)
+        require(app(page)["state"]["player"]["x"] > before["player"]["x"] + .1, "Touch steers actual boat")
+    elif game == "prism-circuit":
+        touch_control(page, '[data-stick="move"]', dx=24, duration=80)
+        after = app(page)["state"]; selected = after["selected"]; rotation = after["tiles"][selected]["rotation"]
+        require(selected != before["selected"], "Touch selects circuit tile")
+        touch_control(page, '#touch-primary', duration=80)
+        require(app(page)["state"]["tiles"][selected]["rotation"] == (rotation+1)%4, "Touch rotates actual circuit")
+    elif game == "skybound-stack":
+        touch_control(page, '[data-stick="move"]', dx=24, duration=100)
+        require(app(page)["state"]["piece"]["x"] > before["piece"]["x"], "Touch moves actual falling shape")
+        touch_control(page, '#touch-secondary', duration=80)
+        require(app(page)["state"]["pieces"] > before["pieces"], "Touch drops and locks actual shape")
+    elif game == "canopy-sprint":
+        touch_control(page, '[data-stick="move"]', dx=-24, duration=80)
+        require(app(page)["state"]["lane"] == 0, "Touch changes runner lane")
+        held = touch_control(page, '#touch-primary', duration=180, during=lambda: app(page)["state"])
+        require(held["height"] > .4, "Touch jump lifts runner")
     else:
         touch_control(page, "#touch-launch", duration=500)
         page.wait_for_timeout(180)
@@ -358,7 +414,21 @@ def main():
             require(page.locator('input[type=email],input[type=password]').count() == 0, "Guest landing does not ask for real personal information")
             layout(page, "desktop-home")
             screenshot(page, "desktop-home")
-        check("landing exposes five games and the all-time global leaderboard", landing)
+        check("landing exposes ten games and the all-time global leaderboard", landing)
+
+        def carousel():
+            page.locator('#featured-next').click()
+            require('NEON RALLY' in page.locator('#hero-title').inner_text(), 'Manual next selects next featured game')
+            page.locator('#featured-previous').click()
+            page.locator('#featured-previous').click()
+            require('CANOPY SPRINT' in page.locator('#hero-title').inner_text(), 'Previous wraps to tenth cabinet')
+            page.locator('#featured-toggle').click()
+            require(page.locator('#featured-toggle').get_attribute('aria-pressed') == 'true', 'Rotation can be paused explicitly')
+            page.locator('#quick-play').click()
+            page.wait_for_function("window.__ARCADE__.selection==='canopy-sprint'")
+            home(page)
+            page.locator('#featured-next').click()
+        check('featured carousel wraps, pauses and launches selected cabinet', carousel)
 
         for game in GAMES:
             def desktop_play(game=game):
@@ -565,7 +635,7 @@ def main():
             detail = layout(phone, "mobile-home")
             screenshot(phone, "mobile-home")
             return detail
-        check("390px touch landing fits five games and leaderboard", mobile_landing)
+        check("390px touch landing fits ten games and leaderboard", mobile_landing)
 
         def touch_resume_guard():
             start(phone, "chrome-siege", touch=True)

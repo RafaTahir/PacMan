@@ -76,6 +76,21 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
       mesh(root, cylinder, z < 0 ? pink : cyan, side * 12.5, 1.35, z, .33, .08, .33);
     }
   }
+  // Outside-wall power cells and recessed hazard stripes reinforce the arena depth.
+  // Their silhouettes never imply collidable cover inside the movement field.
+  for (const side of [-1, 1]) {
+    for (const z of [-6, -2, 2, 6]) {
+      mesh(root, box, black, side * 12.9, 0.38, z, 0.5, 0.72, 1.25);
+      mesh(root, box, hull, side * 12.9, 0.8, z, 0.42, 0.16, 1.12);
+      mesh(root, box, side < 0 ? purple : cyan, side * 12.63, 0.42, z, 0.04, 0.32, 0.7);
+    }
+    for (let x = -7; x <= 7; x += 2) {
+      const stripe = mesh(root, box, dim, x, -0.008, side * 8.65, 0.7, 0.012, 0.22); stripe.rotation.y = -0.55;
+    }
+    for (const x of [-11.2, 11.2]) {
+      const warning = mesh(root, torus, gold, x, 0.025, side * 7.9, 0.42, 0.42, 0.42); warning.rotation.x = Math.PI / 2;
+    }
+  }
   // The player is a twin-pontoon hovercraft with an independent turret and active thrusters.
   const player = new THREE.Group(); root.add(player);
   const hover = new THREE.Group(); player.add(hover);

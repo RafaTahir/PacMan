@@ -4,8 +4,15 @@ import { createSimulation as rally } from "../src/arcade/games/neon-rally/model"
 import { createSimulation as breaker } from "../src/arcade/games/reactor-breaker/model";
 import { createSimulation as siege } from "../src/arcade/games/chrome-siege/model";
 import { createSimulation as pinball } from "../src/arcade/games/midnight-pinball/model";
+import { createSimulation as orbit } from "../src/arcade/games/orbit-salvage/model";
+import { createSimulation as tidal } from "../src/arcade/games/tidal-courier/model";
+import { createSimulation as prism } from "../src/arcade/games/prism-circuit/model";
+import { createSimulation as skybound } from "../src/arcade/games/skybound-stack/model";
+import { createSimulation as canopy } from "../src/arcade/games/canopy-sprint/model";
 import { MAX_TICKS, NEUTRAL_INPUT, TICK_RATE, type ArcadeInput, type GameId, type ReplayInput } from "../src/arcade/shared/contracts";
 import { ApiError } from "./errors";
+
+export const simulationFactories = { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball, "orbit-salvage": orbit, "tidal-courier": tidal, "prism-circuit": prism, "skybound-stack": skybound, "canopy-sprint": canopy };
 
 export function runLimits(game: GameId): { tickRate: number; maxTicks: number } {
   return game === "pacman"
@@ -64,8 +71,8 @@ export function replayScore(gameId: GameId, seed: number, frames: number, inputs
     }
     score = game.state.score;
   } else {
-    const factories = { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball };
-    const simulation = factories[gameId](seed);
+
+    const simulation = simulationFactories[gameId](seed);
     for (let tick = 0; tick < frames; tick++) {
       if (terminal) throw new ApiError(400, "trailing_frames", "Replay continues after the game ended.");
       if (inputs[next]?.[0] === tick) {

@@ -49,3 +49,39 @@ export const rateLimits = sqliteTable("rate_limits", {
   count: integer("count").notNull(),
   expiresAt: integer("expires_at").notNull(),
 }, (table) => [index("rate_limits_expiry_idx").on(table.expiresAt)]);
+
+/** Additive expansion: original runs/scores and their foreign keys never move. */
+export const cabinetRuns = sqliteTable("cabinet_runs", {
+  id: text("id").primaryKey(),
+  game: text("game").notNull(),
+  ruleset: text("ruleset").notNull(),
+  seed: integer("seed").notNull(),
+  issuedAt: integer("issued_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  claimToken: text("claim_token"),
+  claimExpiresAt: integer("claim_expires_at"),
+  status: text("status", { enum: ["issued", "verifying", "accepted", "rejected"] }).notNull().default("issued"),
+}, (table) => [
+  index("cabinet_runs_expiry_idx").on(table.expiresAt),
+  index("cabinet_runs_pending_expiry_idx").on(table.expiresAt).where(sql`${table.status} != 'accepted'`),
+  check("cabinet_runs_status_check", sql`${table.status} in ('issued','verifying','accepted','rejected')`),
+  check("cabinet_runs_game_check", sql`${table.game} in ('orbit-salvage','tidal-courier','prism-circuit','skybound-stack','canopy-sprint')`),
+  check("cabinet_runs_seed_check", sql`${table.seed} between 1 and 4294967295`),
+]);
+export const cabinetScores = sqliteTable("cabinet_scores", {
+  runId: text("run_id").primaryKey().references(() => cabinetRuns.id),
+  game: text("game").notNull(),
+  ruleset: text("ruleset").notNull(),
+  initials: text("initials").notNull(),
+  score: integer("score").notNull(),
+  frames: integer("frames").notNull(),
+  finishedAt: integer("finished_at").notNull(),
+  finishedDay: text("finished_day").notNull(),
+  replayHash: text("replay_hash").notNull(),
+}, (table) => [
+  index("cabinet_scores_all_time_idx").on(table.game, sql`${table.score} desc`, table.finishedAt, table.runId),
+  index("cabinet_scores_daily_idx").on(table.game, table.finishedDay, sql`${table.score} desc`, table.finishedAt, table.runId),
+  check("cabinet_scores_nonnegative_check", sql`${table.score} >= 0`),
+  check("cabinet_scores_frames_check", sql`${table.frames} between 1 and 7272`),
+  check("cabinet_scores_initials_check", sql`length(${table.initials}) = 3 and ${table.initials} not glob '*[^A-Z]*'`),
+]);

@@ -142,6 +142,18 @@ export class RallyView implements ArcadeView {
       this.mesh(this.box, charcoal, side * 8.65, 0.22, -25, 0.12, 0.42, 110);
       this.mesh(this.box, this.material(new THREE.MeshBasicMaterial({ color: 0x31556c })), side * 7.9, 0.012, -25, 0.08, 0.01, 110);
     }
+    // Sculpted roadside neon pylons give the expressway a stronger skyline silhouette.
+    // All geometry stays outside the collision road; buffers/materials use the view registry.
+    const pylonSurface = this.material(new THREE.MeshStandardMaterial({ color: 0x25344d, metalness: 0.68, roughness: 0.32 }));
+    const pylonEdge = this.material(new THREE.MeshBasicMaterial({ color: 0xffb65e }));
+    const pylonCap = this.geometry(new THREE.ConeGeometry(1, 1, 4));
+    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+      const z = -64 + i * 20, x = side * 10.8;
+      this.mesh(this.box, pylonSurface, x, 1.4, z, 0.62, 2.8, 0.9);
+      this.mesh(this.box, pylonEdge, x - side * 0.34, 1.4, z, 0.045, 2.15, 0.65);
+      const cap = this.mesh(pylonCap, pylonSurface, x, 3.1, z, 1.15, 0.72, 1.15); cap.rotation.y = Math.PI / 4;
+      this.mesh(this.box, pylonEdge, x, 2.77, z, 1.5, 0.055, 1.5);
+    }
     this.laneDashes = this.instances(this.box, this.lineMaterial, 60);
     this.curbBlocks = this.instances(this.box, roofPaint, 48);
 

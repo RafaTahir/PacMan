@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { ArcadeView, ThreeStage, VisualOptions } from "../../shared/contracts";
-import { BALL_RADIUS, BUMPERS, RAILS, RAMP_LENGTH, TARGETS, rampPoint, type PinballState } from "./model";
+import { BALL_RADIUS, BUMPERS, RAILS, RAMP_LENGTH, RIVER_LENGTH, TARGETS, rampPoint, riverPoint, type PinballState } from "./model";
 
-const C = { ink: 0x071625, black: 0x030713, cyan: 0x63fff3, violet: 0xa779ff, pink: 0xff54bd, gold: 0xffd36d, white: 0xecffff };
+const C = { ink: 0x083d37, black: 0x091e20, cyan: 0x68ffdb, violet: 0xffba62, pink: 0xff776c, gold: 0xffd36d, white: 0xecffff };
 const vector = (x: number, y: number, z: number) => new THREE.Vector3(x, -y, z);
 
 /** All play mechanisms are meshes in a common table plane, with elevation in Z. */
@@ -12,7 +13,7 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   const material = (color: number, emissive = 0x000000, intensity = 0) => {
     const m = new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: intensity, roughness: 0.36, metalness: 0.32 }); materials.add(m); return m;
   };
-  const bed = material(C.ink), rail = material(0x263e59, C.cyan, 0.12), chrome = material(0xc6dfed), dark = material(C.black), cyan = material(C.cyan, C.cyan, 1.25), pink = material(C.pink, C.pink, 1), violet = material(C.violet, C.violet, 0.6), gold = material(C.gold, C.gold, 0.8);
+  const bed = material(0x083d37), rail = material(0x263e59, C.cyan, 0.12), chrome = material(0xc6dfed), dark = material(C.black), cyan = material(C.cyan, C.cyan, 1.25), pink = material(C.pink, C.pink, 1), violet = material(C.violet, C.violet, 0.6), gold = material(C.gold, C.gold, 0.8);
   const mesh = <T extends THREE.BufferGeometry>(geometry: T, mat: THREE.Material, parent: THREE.Object3D = root) => { geometries.add(geometry); const m = new THREE.Mesh(geometry, mat); parent.add(m); return m; };
   const box = (x: number, y: number, z: number, w: number, h: number, d: number, mat: THREE.Material) => { const o = mesh(new THREE.BoxGeometry(w, h, d), mat); o.position.copy(vector(x, y, z)); return o; };
   const disk = (x: number, y: number, z: number, radius: number, depth: number, mat: THREE.Material) => { const o = mesh(new THREE.CylinderGeometry(radius, radius, depth, 28), mat); o.rotation.x = Math.PI / 2; o.position.copy(vector(x, y, z)); return o; };
@@ -28,7 +29,7 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
     const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }); materials.add(mat);
     const o = mesh(new THREE.PlaneGeometry(width, height), mat); o.position.copy(vector(x, y, z)); return o;
   }
-  const ambient = new THREE.AmbientLight(0xb2c4ff, 1.5), key = new THREE.DirectionalLight(0xe4faff, 2.4), fill = new THREE.DirectionalLight(0xbb77ff, 1.2);
+  const ambient = new THREE.AmbientLight(0xb5eddf, 1.5), key = new THREE.DirectionalLight(0xffefd5, 2.4), fill = new THREE.DirectionalLight(0x64dcb5, 1.2);
   key.position.set(-5, 6, 18); fill.position.set(7, -6, 8); root.add(ambient, key, fill);
   // Physical cabinet, inset playfield, and a luminous apron.
   box(0, 0.05, -0.59, 9.8, 15.4, 1.05, dark);
@@ -37,12 +38,57 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   box(0, -7.38, 0.1, 9.8, 0.32, 0.5, rail); box(0, 7.3, 0.15, 9.8, 0.48, 0.55, dark);
   straight(-4.88, -7.5, -4.88, 7.47, 0.13, 0.035, violet); straight(4.88, -7.5, 4.88, 7.47, 0.13, 0.035, cyan);
   straight(-4.8, 7.55, 4.8, 7.55, 0.15, 0.03, pink);
-  // Deliberately sparse artwork keeps the steel ball and mechanisms legible.
-  for (let i = 0; i < 10; i++) straight(-4.32, -6.7 + i * 1.34, 3.43, -6.7 + i * 1.34, 0.018, 0.008, material(0x143444));
-  for (let i = 0; i < 6; i++) straight(-3.9 + i * 1.35, -6.8, -3.9 + i * 1.35, 6.65, 0.019, 0.007, material(0x12313e));
-  label("M I D N I G H T", -0.2, 0.25, 0.035, 5.6, 0.85, "#bdfcf1", 66);
-  label("P I N B A L L", -0.2, 0.85, 0.036, 3.1, 0.48, "#c6a2ff", 54);
-  label("AFTER HOURS SOCIAL CLUB", -0.12, 6.55, 0.035, 5.7, 0.48, "#819aaf", 42);
+  // One original batik-inspired playfield texture keeps decoration inexpensive.
+  // Every physical mechanism remains independent depth-tested mesh geometry.
+  const art = document.createElement("canvas"); art.width = 768; art.height = 1280;
+  const brush = art.getContext("2d");
+  if (brush) {
+    const grad = brush.createLinearGradient(0, 0, 768, 1280); grad.addColorStop(0, "#125c50"); grad.addColorStop(0.6, "#063f3b"); grad.addColorStop(1, "#07322e");
+    brush.fillStyle = grad; brush.fillRect(0, 0, 768, 1280);
+    // Hand-drawn river, shoreline and contour rings under the wireform routes.
+    brush.lineCap = "round";
+    for (let i = 0; i < 7; i++) {
+      brush.beginPath(); brush.moveTo(600 + i * 9, 1100); brush.bezierCurveTo(500 + i * 10, 850, 650 + i * 7, 600, 530 + i * 9, 310); brush.bezierCurveTo(420 + i * 6, 100, 230, 70 + i * 10, 120, 240);
+      brush.strokeStyle = i % 2 ? "#187169" : "#0d5d57"; brush.lineWidth = 12; brush.stroke();
+    }
+    for (const side of [-1, 1]) for (let i = 0; i < 9; i++) {
+      const x = side < 0 ? 36 + (i % 2) * 13 : 730 - (i % 2) * 13, y = 70 + i * 145;
+      brush.save(); brush.translate(x, y); brush.rotate(side * 0.55);
+      brush.fillStyle = i % 2 ? "#336b4d" : "#527b4a";
+      brush.beginPath(); brush.moveTo(0, -36); brush.bezierCurveTo(65, -38, 61, 27, 0, 48); brush.bezierCurveTo(-9, 23, -12, -15, 0, -36); brush.fill();
+      brush.strokeStyle = "#97a15d"; brush.lineWidth = 2; brush.beginPath(); brush.moveTo(0, -28); brush.lineTo(0, 38); brush.stroke(); brush.restore();
+    }
+    // A restrained repeating diamond weave around the apron, inspired by ketupat.
+    brush.strokeStyle = "#8b9763"; brush.lineWidth = 2;
+    for (let y = 1150; y < 1270; y += 28) for (let x = 140; x < 630; x += 28) { brush.beginPath(); brush.moveTo(x, y - 11); brush.lineTo(x + 11, y); brush.lineTo(x, y + 11); brush.lineTo(x - 11, y); brush.closePath(); brush.stroke(); }
+    const texture = new THREE.CanvasTexture(art); texture.colorSpace = THREE.SRGBColorSpace; textures.add(texture);
+    const artMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, metalness: 0.05 }); materials.add(artMat);
+    const floor = mesh(new THREE.PlaneGeometry(8.85, 14.35), artMat); floor.position.z = 0.009;
+  }
+  const leaf = material(0x46ac72, 0x075932, 0.15), trunk = material(0x9f7045), coral = material(0xff746e, 0xff4034, 0.25);
+  const frondGeometry = new THREE.SphereGeometry(0.17, 8, 6), lanternGeometry = new THREE.SphereGeometry(0.14, 10, 8);
+  // Sculpted palms stand on the cabinet rails, outside every ball trajectory.
+  for (const side of [-1, 1]) {
+    const x = side * 4.62;
+    for (const y of [-4.7, 2.5]) {
+      disk(x, y, 0.55, 0.11, 0.75, trunk);
+      for (let i = 0; i < 6; i++) {
+        const frond = mesh(frondGeometry, leaf), angle = i * Math.PI / 3;
+        frond.scale.set(2.6, 0.62, 0.36); frond.rotation.z = angle;
+        frond.position.copy(vector(x + Math.cos(angle) * 0.23, y + Math.sin(angle) * 0.23, 1.0));
+      }
+    }
+    for (const y of [-6.0, -2.5, 0.5, 4.9]) {
+      const lantern = mesh(lanternGeometry, coral); lantern.scale.set(1, 1.2, 1);
+      lantern.position.copy(vector(x, y, 0.65)); disk(x, y, 0.83, 0.075, 0.03, gold);
+    }
+  }
+  // A tiny pasar malam roof crowns the target bank without hiding the shots.
+  box(0, -7.28, 0.58, 5.2, 0.25, 0.15, trunk);
+  for (let i = 0; i < 9; i++) { const tile = box(-2.32 + i * 0.58, -7.28, 0.78, 0.56, 0.42, 0.1, i % 2 ? gold : coral); tile.rotation.x = -0.1; }
+  label("P U L A U", -0.3, 0.3, 0.035, 3.5, 0.72, "#b6c997", 66);
+  label("M A L A Y S I A", -0.3, 0.86, 0.036, 2.9, 0.42, "#b6c997", 54);
+  label("PASAR MALAM • NIGHT MARKET", -0.12, 6.55, 0.035, 6.3, 0.48, "#c0b575", 42);
   label("01", -2.45, -6.55, 0.04, 0.75, 0.32, "#ffd36d"); label("02", -0.15, -6.65, 0.04, 0.75, 0.32, "#ffd36d"); label("03", 2.15, -6.55, 0.04, 0.75, 0.32, "#ffd36d");
   label("SHOOT", -2.77, -0.06, 0.04, 1.1, 0.32, "#be9fff", 44);
   label("RAMP", -2.77, 0.25, 0.04, 1.1, 0.32, "#be9fff", 44);
@@ -56,12 +102,19 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
     disk(r.ax, r.ay, 0.13, 0.09, 0.24, rail); disk(r.bx, r.by, 0.13, 0.09, 0.24, rail);
   }
   const bumperCaps: THREE.Mesh[] = [], bumperRings: THREE.Mesh[] = [];
+  const petalGeometry = new THREE.SphereGeometry(0.19, 9, 6);
   BUMPERS.forEach((b, i) => {
     disk(b.x, b.y, 0.08, b.radius + 0.16, 0.12, dark); ring(b.x, b.y, 0.15, b.radius + 0.11, violet);
     disk(b.x, b.y, 0.23, b.radius, 0.28, chrome);
     const cap = disk(b.x, b.y, 0.41, b.radius * 0.86, 0.12, material(i === 2 ? C.pink : C.cyan, i === 2 ? C.pink : C.cyan, 0.35)); bumperCaps.push(cap);
     bumperRings.push(ring(b.x, b.y, 0.49, b.radius * 0.66, i === 2 ? pink : cyan, 0.035));
-    disk(b.x, b.y, 0.49, b.radius * 0.25, 0.07, dark);
+    // Five sculpted hibiscus petals sit within the matching physical bumper cap.
+    for (let petal = 0; petal < 5; petal++) {
+      const angle = petal * Math.PI * 2 / 5, flower = mesh(petalGeometry, i === 2 ? gold : coral);
+      flower.position.copy(vector(b.x + Math.cos(angle) * 0.25, b.y + Math.sin(angle) * 0.25, 0.52));
+      flower.scale.set(1.2, 0.72, 0.22); flower.rotation.z = -angle;
+    }
+    disk(b.x, b.y, 0.56, b.radius * 0.17, 0.07, gold);
     label(["100", "100", "100"][i], b.x, b.y + 0.03, 0.54, 0.6, 0.27, "#edffff", 48);
   });
   const targetLamps: THREE.Mesh[] = [];
@@ -92,7 +145,24 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   const rampGeometry = new THREE.BufferGeometry(); rampGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3)); rampGeometry.setIndex(indices); rampGeometry.computeVertexNormals(); mesh(rampGeometry, rampMat);
   line(railLeft, 0.035, chrome); line(railRight, 0.035, chrome);
   for (const t of [0.2, 0.4, 0.62, 0.8]) { const p = rampPoint(t * RAMP_LENGTH); const support = disk(p.x, p.y, (p.z - 0.18) / 2, 0.055, Math.max(0.1, p.z - 0.18), rail); support.name = "ramp support"; ring(p.x, p.y, 0.04, 0.15, violet, 0.015); }
-  label("SKYLINE", -0.55, -5.46, 2.3, 1.9, 0.4, "#ddd0ff", 52);
+  const riverLeft: THREE.Vector3[] = [], riverRight: THREE.Vector3[] = [], riverPositions: number[] = [], riverIndices: number[] = [];
+  for (let i = 0; i <= 80; i++) {
+    const p = riverPoint(i / 80 * RIVER_LENGTH), flat = Math.hypot(p.tx, p.ty), nx = -p.ty / flat, ny = p.tx / flat;
+    for (const side of [-1, 1]) {
+      const v = vector(p.x + nx * 0.33 * side, p.y + ny * 0.33 * side, p.z - BALL_RADIUS + 0.01);
+      riverPositions.push(v.x, v.y, v.z); (side === -1 ? riverLeft : riverRight).push(v.clone().add(new THREE.Vector3(0, 0, 0.16)));
+    }
+    if (i < 80) { const v = i * 2; riverIndices.push(v, v + 1, v + 2, v + 1, v + 3, v + 2); }
+  }
+  const riverGeometry = new THREE.BufferGeometry(); riverGeometry.setAttribute("position", new THREE.Float32BufferAttribute(riverPositions, 3)); riverGeometry.setIndex(riverIndices); riverGeometry.computeVertexNormals();
+  const riverMat = new THREE.MeshStandardMaterial({ color: C.cyan, transparent: true, opacity: 0.32, side: THREE.DoubleSide, roughness: 0.22, metalness: 0.1, depthWrite: false }); materials.add(riverMat); mesh(riverGeometry, riverMat);
+  line(riverLeft, 0.028, chrome); line(riverRight, 0.028, cyan);
+  for (const t of [0.2, 0.45, 0.7]) { const p = riverPoint(t * RIVER_LENGTH); disk(p.x, p.y, (p.z - 0.15) / 2, 0.045, Math.max(0.1, p.z - 0.15), trunk); }
+  label("RIVER", 2.75, 0.08, 0.045, 1.18, 0.3, "#98f5d4", 48);
+  for (let i = 0; i < 3; i++) { const y = -0.4 + i * 0.31; straight(2.55, y + 0.12, 2.75, y, 0.045, 0.025, cyan); straight(2.75, y, 2.95, y + 0.12, 0.045, 0.025, cyan); }
+  const tourLamps = [disk(-0.6, 1.55, 0.03, 0.16, 0.04, material(C.gold, C.gold, 0.05)), disk(0.6, 1.55, 0.03, 0.16, 0.04, material(C.cyan, C.cyan, 0.05))];
+  label("RAMP + RIVER = ISLAND TOUR", 0, 2.05, 0.035, 4, 0.3, "#b6c997", 44);
+  label("ISLAND RUN", -0.55, -5.46, 2.3, 1.9, 0.4, "#ddd0ff", 52);
   const lockLamp = disk(-2.75, -0.45, 0.045, 0.16, 0.035, material(C.violet, C.violet, 0.1));
   const flippers: THREE.Group[] = [];
   state.flippers.forEach((f, index) => {
@@ -115,6 +185,41 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   particles.forEach(p => { p.mesh.visible = false; }); let lastSerial = state.hitSerial, lastTick = state.tick;
   const saveLamp = ring(0, 5.98, 0.035, 0.27, material(C.gold, C.gold, 0.15), 0.035);
   label("SAVE", 0, 6.02, 0.045, 0.57, 0.23, "#ffdc9f", 42);
+  // Bake only immutable, opaque, direct table meshes. Each material becomes
+  // one draw call; animated mechanisms and transparent layers remain separate.
+  // Keeping material identities preserves live high-contrast color updates.
+  const dynamic = new Set<THREE.Object3D>([
+    ...bumperCaps, ...targetLamps, ...slingCaps, ...tourLamps, lockLamp,
+    saveLamp, plunger, ...balls, ...shadows, ...ballRings, ...particles.map(p => p.mesh),
+  ]);
+  const batches = new Map<THREE.Material, THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]>();
+  for (const child of root.children) {
+    if (!(child instanceof THREE.Mesh) || dynamic.has(child) || Array.isArray(child.material) || child.material.transparent) continue;
+    const group = batches.get(child.material) ?? []; group.push(child); batches.set(child.material, group);
+  }
+  for (const [mat, group] of batches) {
+    if (group.length < 2) continue;
+    const parts = group.map(object => {
+      object.updateMatrix();
+      const geometry = object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone();
+      geometry.applyMatrix4(object.matrix); geometry.clearGroups();
+      // Generated wireform beds have no UVs; none of these opaque materials
+      // use maps, so retain only the shared position/normal attributes.
+      for (const attribute of Object.keys(geometry.attributes)) if (attribute !== "position" && attribute !== "normal") geometry.deleteAttribute(attribute);
+      return geometry;
+    });
+    const merged = mergeGeometries(parts, false);
+    parts.forEach(part => part.dispose());
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    const combined = mesh(merged, mat); combined.name = "static tropical table batch";
+    group.forEach(object => root.remove(object));
+  }
+  // Release original CPU/GPU buffers after replacing the meshes, excluding any
+  // geometry still shared by a dynamic object or an unbatched transparent layer.
+  const retained = new Set<THREE.BufferGeometry>();
+  root.traverse(object => { if (object instanceof THREE.Mesh) retained.add(object.geometry); });
+  for (const geometry of geometries) if (!retained.has(geometry)) { geometry.dispose(); geometries.delete(geometry); }
   const camera = stage.camera;
   camera.up.set(0, 1, 0); camera.position.set(0, -7.4, 28); camera.lookAt(0, 0, 0); camera.near = 0.1; camera.far = 100;
   let width = stage.width, height = stage.height;
@@ -130,7 +235,7 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
     update(alpha: number, options: VisualOptions) {
       const t = Math.max(0, Math.min(1, alpha)), advanced = state.tick !== lastTick;
       if (options.highContrast) { bed.color.setHex(0x020913); rail.color.setHex(0x7497b6); }
-      else { bed.color.setHex(C.ink); rail.color.setHex(0x263e59); }
+      else { bed.color.setHex(0x083d37); rail.color.setHex(0x263e59); }
       for (let i = 0; i < 3; i++) {
         const b = state.balls[i]; balls[i].visible = shadows[i].visible = ballRings[i].visible = Boolean(b);
         if (b) {
@@ -145,6 +250,7 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
       }
       state.flippers.forEach((f, i) => { flippers[i].position.copy(vector(f.x, f.y, 0)); flippers[i].rotation.z = -(f.previousAngle + (f.angle - f.previousAngle) * t); });
       slingCaps.forEach((s, i) => { (s.material as THREE.MeshStandardMaterial).emissiveIntensity = state.slingFlash[i] ? 1.2 : 0.18; });
+      tourLamps.forEach((lamp, i) => { (lamp.material as THREE.MeshStandardMaterial).emissiveIntensity = state.tourBits & (1 << i) ? 1.8 : 0.05; });
       (lockLamp.material as THREE.MeshStandardMaterial).emissiveIntensity = state.targetBits === 7 || state.multiball ? 2 : 0.12;
       (saveLamp.material as THREE.MeshStandardMaterial).emissiveIntensity = state.ballSaveUntil > state.tick ? 1.7 : 0.08;
       plunger.position.y = -6.93 - state.plungerCharge * 0.24;

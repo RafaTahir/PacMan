@@ -1,6 +1,6 @@
 # Architecture
 
-The existing project hosts five cabinets. HTML/CSS/TypeScript supply the home, real rankings and common shell. One static Three.js cabinet scene decorates the landing page without an idle loop. Only the chosen game is mounted; game modules are lazy-loaded and share Three.js. Render resolution and effect/entity pools are bounded.
+The existing project hosts ten cabinets. HTML/CSS/TypeScript supply the home, real rankings and common shell. The featured carousel selects a cabinet and its neighbors in a static Three.js scene without an idle render loop. Rotation pauses for focus, hover, background pages, reduced motion, or its explicit pause button. Only the chosen game is mounted; game modules are lazy-loaded and share Three.js. Render resolution and effect/entity pools are bounded.
 
 ## Deterministic simulation
 
@@ -33,3 +33,7 @@ Schema-only Drizzle migrations are append-only. Never rewrite applied migrations
 Guest initials are three-letter public labels, not authenticated identity; duplicates are allowed. No client user ID/email is trusted. Google sign-in is unavailable in this Sites build; no custom OAuth/session service or fake provider is scaffolded. Replay checking cannot establish human play or prevent automated search over legal inputs. Rate/request/model bounds do not certify production CPU/D1 quotas or defeat distributed denial of service.
 
 The existing Sites project appgprj_6add9f91d5088191b2397efdda9c3663 declares d1:'DB',r2:null. Assets are dist/ and portable Worker bundle build/worker.mjs. The coordinating publisher uses the supported Sites adapter, preserves audience/database, applies pending migrations then uploads Worker. No new Site or separate Cloudflare account is required. Local validation, Git source publication and public deployment remain separate.
+
+## Ten-cabinet storage extension
+
+Migration 0002 adds cabinet_runs/cabinet_scores for the five added IDs. Existing runs/scores, constraints, indexes and foreign keys are untouched. Fixed whitelisted storage routing applies the same claim, replay, duplicate and retention behavior to both namespaces. Apply 0002 before uploading the Worker. Ruleset v2 covers the new pinball river route; accepted v1 history remains readable and idempotently retriable, while stale unaccepted v1 tickets receive ruleset_mismatch.

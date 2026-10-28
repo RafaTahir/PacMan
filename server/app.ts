@@ -1,6 +1,7 @@
 import { GAME_IDS, RULESET_VERSION, type GameId } from "../src/arcade/shared/contracts";
 import { type D1Database, type D1Result, type D1Statement, type Env, successful } from "./d1";
 import { ApiError } from "./errors";
+import { additionalCabinetStore, storeForGame } from "./cabinet-store";
 import { validateInitials } from "./initials";
 import { replayScore, runLimits, validateReplay } from "./replay";
 
@@ -145,6 +146,7 @@ async function leaderboard(request: Request, url: URL, db: D1Database, env: Env,
   if ((scope === "all" && url.searchParams.has("day")) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(`${day}T00:00:00Z`)) || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day || day > today)
     throw new ApiError(400, "invalid_day", "Use a valid UTC date up to today with the daily board.");
   await rateLimit(request, db, env, "board", now);
+  db = storeForGame(db, game);
   const query = scope === "daily"
     ? db.prepare("SELECT run_id, initials, score, finished_at FROM scores WHERE game = ? AND finished_day = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?").bind(game, day, Number(limitText))
     : db.prepare("SELECT run_id, initials, score, finished_at FROM scores WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?").bind(game, Number(limitText));
@@ -163,7 +165,7 @@ async function startRun(request: Request, db: D1Database, env: Env, clock: () =>
   // A slow request-body upload must not count as time playing an unknown seed.
   const issuedAt = clock();
   const expiresAt = issuedAt + RUN_LIFETIME_MS;
-  await execute(db.prepare("INSERT INTO runs (id, game, ruleset, seed, issued_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, 'issued')").bind(runId, game, RULESET_VERSION, seed, issuedAt, expiresAt));
+  await execute(storeForGame(db, game).prepare("INSERT INTO runs (id, game, ruleset, seed, issued_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, 'issued')").bind(runId, game, RULESET_VERSION, seed, issuedAt, expiresAt));
   if ((crypto.getRandomValues(new Uint8Array(1))[0] & 31) === 0) await pruneExpired(db, issuedAt);
   return json({ runId, seed, game, ruleset: RULESET_VERSION, ...runLimits(game), expiresAt: new Date(expiresAt).toISOString() }, 201);
 }
@@ -173,6 +175,7 @@ export async function pruneExpired(db: D1Database, now: number): Promise<void> {
     // Partial index excludes permanent accepted history; each sweep handles
     // at most 100 abandoned tickets, independent of the accepted row count.
     db.prepare("DELETE FROM runs WHERE id IN (SELECT id FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' AND expires_at < ? ORDER BY expires_at LIMIT 100) AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(now),
+    additionalCabinetStore(db).prepare("DELETE FROM runs WHERE id IN (SELECT id FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' AND expires_at < ? ORDER BY expires_at LIMIT 100) AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(now),
   ]);
 }
 async function acceptedRow(db: D1Database, runId: string): Promise<AcceptedScoreRow | null> {
@@ -210,7 +213,13 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
   const body = await readJson(request);
   fields(body, ["initials", "frames", "inputs", "score"]);
   const now = clock();
-  const run = await db.prepare("SELECT id, game, ruleset, seed, issued_at, expires_at, status, claim_token, claim_expires_at FROM runs WHERE id = ?").bind(runId).first<RunRow>();
+  const lookup = "SELECT id, game, ruleset, seed, issued_at, expires_at, status, claim_token, claim_expires_at FROM runs WHERE id = ?";
+  let run = await db.prepare(lookup).bind(runId).first<RunRow>();
+  if (!run) {
+    const extra = additionalCabinetStore(db);
+    run = await extra.prepare(lookup).bind(runId).first<RunRow>();
+    if (run) db = extra;
+  }
   if (!run) throw new ApiError(404, "run_not_found", "Ranked run not found.");
   if (run.status === "accepted") {
     const row = await acceptedRow(db, runId);
@@ -294,7 +303,7 @@ export async function handleRequest(request: Request, env: Env, clock: () => num
       if (cached && now >= cached.checkedAt && now - cached.checkedAt < HEALTH_CACHE_MS)
         return json({ ok: cached.connected, database: cached.connected ? "recently_connected" : "unavailable", ruleset: RULESET_VERSION, checkedAt: new Date(cached.checkedAt).toISOString(), cached: true }, cached.connected ? 200 : 503);
       try {
-        await env.DB.prepare("SELECT (SELECT claim_token FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' LIMIT 1) AS claim_token, (SELECT claim_expires_at FROM runs LIMIT 1) AS claim_expires_at, (SELECT key FROM service_settings LIMIT 1) AS settings_key, (SELECT run_id FROM scores LIMIT 1) AS score_id, (SELECT key FROM rate_limits LIMIT 1) AS counter_key").all().then(successful);
+        await env.DB.prepare("SELECT (SELECT claim_token FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' LIMIT 1) AS claim_token, (SELECT claim_expires_at FROM runs LIMIT 1) AS claim_expires_at, (SELECT key FROM service_settings LIMIT 1) AS settings_key, (SELECT run_id FROM scores LIMIT 1) AS score_id, (SELECT key FROM rate_limits LIMIT 1) AS counter_key, (SELECT id FROM cabinet_runs LIMIT 1) AS cabinet_run_id, (SELECT run_id FROM cabinet_scores LIMIT 1) AS cabinet_score_id").all().then(successful);
         healthCache.set(env.DB, { checkedAt: now, connected: true });
         return json({ ok: true, database: "connected", ruleset: RULESET_VERSION, checkedAt: new Date(now).toISOString(), cached: false });
       } catch {

@@ -53,7 +53,11 @@ void main() {
   vec3 halfway = normalize(light + vec3(0.0, 0.0, 1.0));
   float specular = pow(max(dot(normal, halfway), 0.0), 28.0);
   vec3 surface = uColor * (0.38 + 0.62 * diffuse);
-  surface += vec3(1.0, 0.98, 0.91) * specular * 0.26;
+  surface += vec3(1.0, 0.98, 0.91) * specular * 0.30;
+  // A restrained cabinet rim light reveals real mesh curvature without a postprocess.
+  float rim = pow(1.0 - max(normal.z, 0.0), 2.0);
+  float fill = max(dot(normal, normalize(vec3(0.75, 0.25, 0.5))), 0.0);
+  surface += uColor * fill * 0.08 + vec3(0.10, 0.21, 0.30) * rim * 0.22;
   gl_FragColor = vec4(surface, 1.0);
 }`;
 

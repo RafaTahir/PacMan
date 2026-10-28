@@ -1,6 +1,6 @@
 # After Hours Arcade
 
-Five browser cabinets in one neon arcade: the preserved Pac-Man tribute, Neon Rally, Reactor Breaker, Chrome Siege and Midnight Pinball. The four new games use original procedural Three.js meshes over readable playfields, deterministic simulations and keyboard/pointer/touch controls.
+Ten browser cabinets in one arcade: Pac-Man, Neon Rally, Reactor Breaker, Chrome Siege, Malaysian tropical Midnight Pinball, Orbit Salvage, Tidal Courier, Prism Circuit, Skybound Stack and Canopy Sprint. Original procedural 3D meshes, deterministic simulations and keyboard/touch controls keep each cabinet portable. The featured carousel rotates through every game, with manual navigation and a rotation pause control.
 
 The home page displays **real global, persistent, per-game leaderboards**. All time is the default; Today (UTC) is optional. Accepted records live in D1 independently of browsers and deployments. No competitor scores are seeded. Service failures show an honest error or an explicitly local practice run.
 
@@ -55,7 +55,7 @@ WebGL restoration rebuilds new-game views over the same simulation and requires 
 
 ## Real rankings and initials
 
-After a ranked run, enter exactly three A–Z initials. They are public labels, not unique identities or accounts; duplicates are allowed. No passwords, email or profile ownership are claimed. **Google sign-in is not implemented in this Sites build.** There is no fake login or custom OAuth workaround. All five main games are open to guests.
+After a ranked run, enter exactly three A–Z initials. They are public labels, not unique identities or accounts; duplicates are allowed. No passwords, email or profile ownership are claimed. **Google sign-in is not implemented in this Sites build.** There is no fake login or custom OAuth workaround. All ten main games are open to guests.
 
 The Worker derives the score by replaying the actual seeded model. It validates tickets, durations, input ranges/order, claimed scores and body limits. Leased claims, atomic writes and a unique run constraint prevent duplicate entries and recover transient failures. Matching accepted retries return the existing result. Moderation, rate limits and bounded verification reduce abuse. Replay validation does not prove human play or prevent tool-assisted legal inputs. [API/security notes](docs/LEADERBOARDS.md) explain those limits.
 
@@ -105,3 +105,5 @@ Runtime framework attribution: [Third-party notices](THIRD_PARTY_NOTICES.md), al
 Run `npm run build:sites`, then `npm run test:sites`. The package entry is `dist-sites/server/index.js`: one Worker ESM containing all static `dist/` assets and the existing API. It supplies `ASSETS.fetch` internally, so Sites needs only its provisioned `DB` binding, not a separate static-assets binding. MIME/byte lengths, GET/HEAD, ETag/cache headers, byte ranges, SPA navigation and missing-file statuses are preserved; API responses and database bindings pass through unchanged.
 
 The package also copies the immutable `drizzle/` SQL/snapshots/journal and `.openai/hosting.json` byte-for-byte. The Worker hosting manifest keeps the existing project ID, `d1:"DB"`, and `r2:null`, without obsolete `static_dir`. Apply pending schema migrations before uploading this packaged Worker through the official Sites WorkerESM workflow. The packaging step does not publish or migrate a remote database.
+
+The ten-cabinet release and its database-preservation/validation notes are documented in [Arcade expansion](docs/ARCADE_EXPANSION.md).

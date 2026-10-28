@@ -43,3 +43,18 @@ body.reduced-motion *,body.reduced-motion *:before,body.reduced-motion *:after{a
 
 /* Keep the daily board timezone explicit inside its native selector. */
 .board-scope{min-width:105px;flex:1.05}
+
+/* The featured cabinet is selectable without leaving the home page. */
+.hero-panel{--featured-accent:var(--yellow)}
+.hero-panel:before{background:linear-gradient(90deg,var(--featured-accent),transparent 70%)}
+.featured-controls{position:absolute;z-index:2;right:30px;top:26px;display:flex;gap:8px}
+.featured-controls .icon-button{background:#141517dd;border-color:#777;color:#fff}
+.featured-controls .icon-button:hover{border-color:var(--featured-accent);color:var(--featured-accent)}
+@media(max-width:640px){.featured-controls{right:18px;top:18px}.hero-copy>.eyebrow{max-width:calc(100% - 105px)}}
+.hero-copy h1{font-size:clamp(48px,6vw,84px);line-height:.95;max-width:90%;overflow-wrap:anywhere;color:var(--featured-accent)}
+@media(max-width:640px){.hero-copy h1{font-size:clamp(44px,11vw,68px);max-width:100%}}
+.featured-controls{position:relative;inset:auto;justify-content:flex-end;padding:12px 26px;border-top:1px solid #ffffff15;gap:10px;align-items:center}
+.featured-toggle{margin-right:auto;min-height:44px;padding:8px 12px;background:transparent;border:1px solid #686c70;border-radius:3px;font-size:11px;color:var(--paper)}
+.featured-toggle:hover{border-color:var(--featured-accent)}
+.cabinet-art:not([class*="art-"]){background:radial-gradient(ellipse at center,color-mix(in srgb,var(--game-accent) 12%,transparent),transparent 70%)}
+@media(max-width:640px){.hero-copy>.eyebrow{max-width:100%}.featured-controls{padding:10px 18px}.hero-copy h1{min-height:2em}}

@@ -7,8 +7,9 @@ export class Showroom {
   private stage: Stage | null = null;
   private frame = 0;
   private disposed = false;
+  private readonly groups: THREE.Group[] = [];
   private readonly cabinetBounds = new THREE.Box3();
-  constructor(private mount: HTMLElement, private reducedMotion: boolean) {
+  constructor(private mount: HTMLElement, private reducedMotion: boolean, featured = 0) {
     try {
       this.stage = new Stage(mount, () => this.dispose(), () => {});
       const { scene, camera } = this.stage;
@@ -41,11 +42,25 @@ export class Showroom {
         }
         add(group, 0, 0.68, 0.8, 0.32, 0.16, 0.04, new THREE.MeshStandardMaterial({ color: 0x04060b }));
         add(group, 0, 0.08, 0.1, 1.98, 0.1, 1.92, trim);
-        scene.add(group);
+        scene.add(group); this.groups.push(group);
         this.cabinetBounds.expandByObject(group);
       });
-      this.resize(); this.draw();
-    } catch { mount.classList.add("showroom-fallback"); mount.setAttribute("aria-label", "Five arcade cabinets, open for one more round."); }
+      this.setFeatured(featured); this.draw();
+    } catch { mount.classList.add("showroom-fallback"); mount.setAttribute("aria-label", "Arcade cabinets, open for one more round."); }
+  }
+  setFeatured(index: number): void {
+    this.cabinetBounds.makeEmpty();
+    this.groups.forEach((group, i) => {
+      const offset = (i - index + cabinets.length) % cabinets.length;
+      const side = offset === 0 ? 0 : offset === 1 ? 1 : offset === cabinets.length - 1 ? -1 : 2;
+      group.visible = side !== 2;
+      if (!group.visible) return;
+      group.position.set(side * 2.65, 0, side === 0 ? 0.7 : -0.3);
+      group.scale.setScalar(side === 0 ? 1.16 : 0.82);
+      group.rotation.y = side * -0.2;
+      group.updateMatrixWorld(true); this.cabinetBounds.expandByObject(group);
+    });
+    this.resize();
   }
   private screen(title: string, accent: string, index: number): THREE.CanvasTexture {
     const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 256;

@@ -2,11 +2,7 @@ import { expect, it } from "vitest";
 import { Game } from "../src/engine";
 import { TICK_SECONDS } from "../src/levels";
 import { GAME_IDS, NEUTRAL_INPUT, type ArcadeInput, type GameId, type ReplayInput } from "../src/arcade/shared/contracts";
-import { createSimulation as rally } from "../src/arcade/games/neon-rally/model";
-import { createSimulation as breaker } from "../src/arcade/games/reactor-breaker/model";
-import { createSimulation as siege } from "../src/arcade/games/chrome-siege/model";
-import { createSimulation as pinball } from "../src/arcade/games/midnight-pinball/model";
-import { replayScore, runLimits } from "../server/replay";
+import { replayScore, runLimits, simulationFactories } from "../server/replay";
 
 function activeInput(game: GameId, tick: number): ArcadeInput {
   const phase = Math.floor(tick / 45) % 4;
@@ -14,6 +10,11 @@ function activeInput(game: GameId, tick: number): ArcadeInput {
   if (game === "neon-rally") return { x: phase === 0 ? -25 : phase === 2 ? 25 : 0, y: 35, aimX: 0, aimY: -127, buttons: tick % 90 < 45 ? 1 : 2 };
   if (game === "reactor-breaker") return { x: 0, y: 0, aimX: Math.round(Math.sin(tick / 120) * 100), aimY: -127, buttons: 1 | 8 };
   if (game === "chrome-siege") return { x: Math.round(Math.sin(tick / 140) * 127), y: Math.round(Math.cos(tick / 140) * 127), aimX: Math.round(Math.cos(tick / 20) * 127), aimY: Math.round(Math.sin(tick / 20) * 127), buttons: 1 | (tick % 180 < 12 ? 2 : 0) };
+  if (game === "orbit-salvage") return { x: phase % 2 ? 85 : -85, y: phase < 2 ? -90 : 90, aimX: Math.round(Math.cos(tick / 28) * 127), aimY: Math.round(Math.sin(tick / 28) * 127), buttons: 1 | (tick % 180 < 12 ? 2 : 0) };
+  if (game === "tidal-courier") return { x: phase === 0 ? -100 : phase === 2 ? 100 : 0, y: phase === 1 ? -110 : phase === 3 ? 110 : 0, aimX: 0, aimY: -127, buttons: tick % 240 < 40 ? 1 : 0 };
+  if (game === "prism-circuit") return { x: phase === 0 ? 127 : phase === 2 ? -127 : 0, y: phase === 1 ? 127 : phase === 3 ? -127 : 0, aimX: 0, aimY: -127, buttons: tick % 24 < 2 ? 1 : tick % 240 < 2 ? 2 : 0 };
+  if (game === "skybound-stack") return { x: phase === 0 ? -127 : phase === 2 ? 127 : 0, y: tick % 90 < 10 ? 127 : 0, aimX: 0, aimY: -127, buttons: tick % 35 < 2 ? 1 : tick % 120 < 2 ? 2 : 0 };
+  if (game === "canopy-sprint") return { x: phase === 0 ? -127 : phase === 2 ? 127 : 0, y: 0, aimX: 0, aimY: -127, buttons: tick % 100 < 2 ? 1 : tick % 100 > 60 && tick % 100 < 75 ? 2 : 0 };
   return { x: 0, y: 0, aimX: 0, aimY: -127, buttons: (tick % 100 < 70 ? 4 : 0) | (tick % 30 < 15 ? 1 : 2) };
 }
 function sample(game: GameId, seed: number, active: boolean): { frames: number; inputs: ReplayInput[]; score: number } {
@@ -21,7 +22,7 @@ function sample(game: GameId, seed: number, active: boolean): { frames: number; 
   let last: ArcadeInput = { ...NEUTRAL_INPUT };
   const pacman = game === "pacman" ? new Game({ seed }) : null;
   pacman?.start();
-  const simulation = game === "pacman" ? null : { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball }[game](seed);
+  const simulation = game === "pacman" ? null : simulationFactories[game](seed);
   let frames = 0;
   while (frames < runLimits(game).maxTicks && (pacman ? pacman.state.phase !== "game-over" : simulation!.state.status === "playing")) {
     const input = active ? activeInput(game, frames) : { ...NEUTRAL_INPUT };

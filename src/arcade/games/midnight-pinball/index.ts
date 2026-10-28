@@ -6,10 +6,10 @@ export { createSimulation } from "./model";
 export const gameDefinition: GameDefinition = {
   id: "midnight-pinball",
   title: "MIDNIGHT PINBALL",
-  description: "Steel, skyline ramps and a three-ball midnight jackpot. Light the stars, shoot the ramp, keep the night alive.",
-  accent: "#bd9aff", controls: "flippers",
-  desktopInstructions: "Z / left arrow: left flipper · / / right arrow: right flipper · hold Space, release to launch · WASD: nudge (watch tilt). Light 3 gold stars, then shoot the left ramp for multiball. 3 balls · 2 minutes.",
-  touchInstructions: "Hold LEFT / RIGHT to flip · hold LAUNCH, release to plunge. Light all 3 gold stars, then shoot the left ramp for multiball. Ramp shots during multiball collect jackpots. 3 balls · 2 minutes.",
+  description: "A Malaysian island after dark. Fire the hibiscus bumpers, tour the island ramp and river orbit, then light three stars for pasar malam multiball.",
+  accent: "#68ddae", controls: "flippers",
+  desktopInstructions: "Z / left arrow: left flipper · / / right arrow: right flipper · hold Space, release to launch · WASD: nudge (watch tilt). Light 3 gold stars, then shoot the left ramp for multiball. Complete left ramp + right river for Island Tour bonus and multiplier. 3 balls · 2 minutes.",
+  touchInstructions: "Hold LEFT / RIGHT to flip · hold LAUNCH, release to plunge. Light all 3 gold stars, then shoot the left ramp for multiball. Complete left ramp + right river for Island Tour bonus. Both routes pay multiball jackpots. 3 balls · 2 minutes.",
   primaryLabel: "LEFT FLIPPER", secondaryLabel: "RIGHT FLIPPER",
   createSimulation,
   createView: (stage, simulation) => createView(stage, simulation.state as PinballState),
@@ -21,7 +21,8 @@ export const gameDefinition: GameDefinition = {
       { label: "MULTIPLIER", value: `×${s.multiplier}`, kind: "combo" },
       { label: s.multiball ? "MULTIBALL" : "STAR LOCK", value: s.multiball ? `${s.balls.length} BALLS · RAMP JACKPOT` : s.targetBits === 7 ? "LIT · SHOOT LEFT RAMP" : stars, kind: "combo" },
       { label: s.tilted ? "TILT" : "TABLE", value: s.tilted ? "FLIPPERS DISABLED" : s.ballSaveUntil > s.tick ? `SAVE ${Math.ceil((s.ballSaveUntil - s.tick) / 60)}s` : `${Math.round(s.tilt * 100)}% TILT`, kind: "energy" },
-      { label: "NIGHT SHIFT", value: s.messageUntil > s.tick ? s.message : s.multiball ? "SHOOT THE RAMP FOR JACKPOT" : "LIGHT 3 STARS → LEFT RAMP" },
+      { label: "ISLAND TOUR", value: `${s.tours} TOURS · ${s.tourBits & 1 ? "RAMP ✓" : "RAMP ○"} ${s.tourBits & 2 ? "RIVER ✓" : "RIVER ○"}`, kind: "combo" },
+      { label: "NIGHT SHIFT", value: s.messageUntil > s.tick ? s.message : s.multiball ? "BOTH ROUTES PAY JACKPOTS" : "3 STARS → LEFT RAMP · RAMP + RIVER = TOUR" },
     ];
   },
 };

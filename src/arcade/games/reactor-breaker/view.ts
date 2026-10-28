@@ -56,6 +56,15 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
   }
   mesh(box(16.5, 0.4, 0.22), railMaterial, 0, 0.12, -9.68);
   mesh(box(15.8, 0.04, 0.035), railGlow, 0, 0.35, -9.54);
+  // Exterior power couplings create a tangible containment machine without obstructing play.
+  const couplingShape = geometry(new THREE.CylinderGeometry(0.26, 0.34, 0.7, 12));
+  const couplingRing = geometry(new THREE.TorusGeometry(0.29, 0.045, 5, 16)); couplingRing.rotateX(Math.PI / 2);
+  const couplingGlow = basic(0x63ddd0);
+  for (const side of [-1, 1]) for (const z of [-8.2, -3.1, 2.0, 7.1]) {
+    mesh(couplingShape, railMaterial, side * 8.48, 0.43, z);
+    mesh(couplingRing, couplingGlow, side * 8.48, 0.72, z);
+    mesh(box(0.055, 0.035, 3.8), couplingGlow, side * 8.48, 0.04, z + 1.85);
+  }
   const shieldMaterial = material(new THREE.MeshBasicMaterial({ color: 0x54e6ff, transparent: true, opacity: 0.65 }));
   const shield = mesh(box(15.65, 0.07, 0.075), shieldMaterial, 0, 0.16, 10.02);
   const reserveShield = mesh(box(15.65, 0.025, 0.04), shieldMaterial, 0, 0.12, 10.17);
@@ -117,6 +126,14 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
     for (let y = 0; y <= h; y += 64) { context.beginPath(); context.moveTo(0, y); context.lineTo(w, y); context.stroke(); }
     context.strokeStyle = highContrast ? "#598393" : "#254351"; context.lineWidth = 3;
     context.strokeRect(24, 22, w - 48, h - 44);
+    // Etched bus traces distinguish the industrial floor from a plain wire grid.
+    context.strokeStyle = highContrast ? "#3e7682" : "#1b3f4a"; context.lineWidth = 2;
+    for (const side of [-1, 1]) for (let row = 0; row < 5; row++) {
+      const x = w / 2 + side * (120 + row * 37), y = 160 + row * 125;
+      context.beginPath(); context.moveTo(side < 0 ? 32 : w - 32, y); context.lineTo(x, y); context.lineTo(x, y + 70); context.lineTo(x - side * 35, y + 105); context.stroke();
+      context.beginPath(); context.arc(x - side * 35, y + 105, 5, 0, Math.PI * 2); context.stroke();
+    }
+
     const towerEnd = (-0.7 - BOARD.top) / (BOARD.bottom - BOARD.top) * h;
     context.setLineDash([12, 15]); context.beginPath(); context.moveTo(35, towerEnd); context.lineTo(w - 35, towerEnd); context.stroke(); context.setLineDash([]);
     context.font = "700 23px ui-monospace, monospace"; context.textAlign = "left"; context.fillStyle = highContrast ? "#97c3cc" : "#456975";

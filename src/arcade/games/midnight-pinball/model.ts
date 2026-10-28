@@ -3,7 +3,7 @@ import { clamp, seededRandom } from "../../shared/math";
 
 export const BALL_RADIUS = 0.155;
 export const TABLE = { left: -4.45, right: 4.45, top: -7.05, drain: 7.45 } as const;
-export type BallMode = "plunger" | "table" | "ramp" | "air";
+export type BallMode = "plunger" | "table" | "ramp" | "river" | "air";
 export interface PinballBall {
   id: number; x: number; y: number; z: number; px: number; py: number; pz: number;
   vx: number; vy: number; vz: number; mode: BallMode;
@@ -13,7 +13,7 @@ export interface PinballBall {
 export interface Flipper { x: number; y: number; length: number; angle: number; previousAngle: number; omega: number }
 export interface PinballState extends ArcadeState {
   balls: PinballBall[]; flippers: [Flipper, Flipper]; ballsRemaining: number; ballNumber: number;
-  multiplier: number; targetBits: number; rampShots: number; jackpots: number; multiball: boolean;
+  multiplier: number; targetBits: number; rampShots: number; riverShots: number; tourBits: number; tours: number; jackpots: number; multiball: boolean;
   ballSaveUntil: number; serveAt: number; plungerCharge: number; tilt: number; tilted: boolean;
   nudgeCooldown: number; bumperFlash: number[]; targetFlash: number[]; slingFlash: number[];
   hitSerial: number; lastHit: { x: number; y: number; z: number }; message: string; messageUntil: number;
@@ -68,6 +68,30 @@ export function rampPoint(distance: number): { x: number; y: number; z: number; 
   throw new Error("Invalid ramp distance");
 }
 
+/** A second elevated orbit follows the river around the island. Its entry is
+ * on the right, so players can deliberately alternate the two flipper shots. */
+export const RIVER_POINTS = [
+  { x: 2.75, y: -0.8, z: BALL_RADIUS }, { x: 2.95, y: -3.9, z: 0.45 },
+  { x: 2.7, y: -5.5, z: 0.9 }, { x: 1.6, y: -6.5, z: 1.0 },
+  { x: 0, y: -6.7, z: 1.05 }, { x: -1.8, y: -6.3, z: 0.9 },
+  { x: -3.5, y: -4.9, z: 0.65 }, { x: -3.7, y: -2, z: 0.3 },
+  { x: -3.15, y: 0.2, z: 0.18 },
+] as const;
+const riverLengths = RIVER_POINTS.slice(1).map((p, i) => Math.hypot(p.x - RIVER_POINTS[i].x, p.y - RIVER_POINTS[i].y, p.z - RIVER_POINTS[i].z));
+export const RIVER_LENGTH = riverLengths.reduce((a, b) => a + b, 0);
+export function riverPoint(distance: number): ReturnType<typeof rampPoint> {
+  let remaining = clamp(distance, 0, RIVER_LENGTH);
+  for (let i = 0; i < riverLengths.length; i++) {
+    const length = riverLengths[i];
+    if (remaining <= length || i === riverLengths.length - 1) {
+      const a = RIVER_POINTS[i], b = RIVER_POINTS[i + 1], t = remaining / length;
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t, tx: (b.x - a.x) / length, ty: (b.y - a.y) / length, tz: (b.z - a.z) / length };
+    }
+    remaining -= length;
+  }
+  throw new Error("Invalid river distance");
+}
+
 interface Contact { t: number; nx: number; ny: number; push: number }
 interface PreparedRail extends Rail {
   length: number; tx: number; ty: number; radius: number;
@@ -120,7 +144,7 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
   const state: PinballState = {
     seed: seed >>> 0, tick: 0, score: 0, status: "playing", balls: [],
     flippers: [{ x: -2.2, y: 5.08, length: 2, angle: 0.43, previousAngle: 0.43, omega: 0 }, { x: 2.2, y: 5.08, length: 2, angle: Math.PI - 0.43, previousAngle: Math.PI - 0.43, omega: 0 }],
-    ballsRemaining: 3, ballNumber: 1, multiplier: 1, targetBits: 0, rampShots: 0, jackpots: 0, multiball: false,
+    ballsRemaining: 3, ballNumber: 1, multiplier: 1, targetBits: 0, rampShots: 0, riverShots: 0, tourBits: 0, tours: 0, jackpots: 0, multiball: false,
     ballSaveUntil: 0, serveAt: 0, plungerCharge: 0, tilt: 0, tilted: false, nudgeCooldown: 0,
     bumperFlash: [0, 0, 0], targetFlash: [0, 0, 0], slingFlash: [0, 0],
     hitSerial: 0, lastHit: { x: 0, y: 0, z: 0 }, message: "HOLD LAUNCH · RELEASE TO PLUNGE", messageUntil: 360, contacts: 0,
@@ -147,26 +171,45 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
   serve(false, true);
   function completeRamp(ball: PinballBall) {
     state.rampShots++;
-    if (state.multiball) { award(5000); state.jackpots++; announce("MIDNIGHT JACKPOT!"); signals.push({ type: "chain", value: state.multiplier }); }
+    if (state.multiball) { award(5000); state.jackpots++; announce("ISLAND JACKPOT!"); signals.push({ type: "chain", value: state.multiplier }); }
     else if (state.targetBits === 7 && !state.tilted) {
       state.targetBits = 0; state.multiball = true; state.ballSaveUntil = state.tick + 600;
       state.multiplier = Math.min(5, state.multiplier + 1); award(2000);
       while (state.balls.length < 3) serve(true);
-      announce("MIDNIGHT MULTIBALL · RAMPS SCORE JACKPOT", 240); signals.push({ type: "multiball" });
-    } else { award(1500); announce("SKYLINE RAMP · LIGHT ALL THREE STARS"); signals.push({ type: "boost" }); }
+      announce("PASAR MALAM MULTIBALL · BOTH ROUTES SCORE JACKPOT", 240); signals.push({ type: "multiball" });
+    } else { award(1500); announce("ISLAND RAMP · SHOOT THE RIGHT RIVER ORBIT"); signals.push({ type: "boost" }); }
+    finishTour(1);
     flash(ball);
   }
+  function finishTour(bit: number) {
+    if (state.tilted) return;
+    state.tourBits |= bit;
+    if (state.tourBits === 3) {
+      state.tourBits = 0; state.tours++; award(3000);
+      state.multiplier = Math.min(5, state.multiplier + 1);
+      announce("ISLAND TOUR COMPLETE · +3,000 · MULTIPLIER UP", 240);
+      signals.push({ type: "upgrade" });
+    }
+  }
+  function completeRiver(ball: PinballBall) {
+    state.riverShots++;
+    award(state.multiball ? 3000 : 900);
+    if (state.multiball) { state.jackpots++; announce("RIVER JACKPOT!"); signals.push({ type: "chain" }); }
+    else { announce("RIVER ORBIT · SHOOT LEFT RAMP FOR ISLAND TOUR"); signals.push({ type: "boost" }); }
+    finishTour(2); flash(ball);
+  }
   function moveRamp(ball: PinballBall, dt: number) {
-    const point = rampPoint(ball.rampDistance);
+    const river = ball.mode === "river", pointAt = river ? riverPoint : rampPoint, length = river ? RIVER_LENGTH : RAMP_LENGTH;
+    const point = pointAt(ball.rampDistance);
     ball.rampSpeed += (-9.8 * point.tz - ball.rampSpeed * 0.025) * dt;
     ball.rampDistance += ball.rampSpeed * dt;
     if (ball.rampDistance < 0) {
-      ball.mode = "table"; ball.x = RAMP_POINTS[0].x; ball.y = RAMP_POINTS[0].y + 0.05; ball.z = BALL_RADIUS; ball.vx = 0; ball.vy = Math.max(3, -ball.rampSpeed); ball.contactCooldown = 12; return;
+      ball.mode = "table"; ball.x = river ? RIVER_POINTS[0].x : RAMP_POINTS[0].x; ball.y = (river ? RIVER_POINTS[0].y : RAMP_POINTS[0].y) + 0.05; ball.z = BALL_RADIUS; ball.vx = 0; ball.vy = Math.max(3, -ball.rampSpeed); ball.contactCooldown = 12; return;
     }
-    const next = rampPoint(ball.rampDistance);
+    const next = pointAt(ball.rampDistance);
     ball.x = next.x; ball.y = next.y; ball.z = next.z;
     ball.vx = next.tx * ball.rampSpeed; ball.vy = next.ty * ball.rampSpeed; ball.vz = next.tz * ball.rampSpeed;
-    if (ball.rampDistance >= RAMP_LENGTH) { ball.mode = "air"; completeRamp(ball); ball.contactCooldown = 15; }
+    if (ball.rampDistance >= length) { ball.mode = "air"; if (river) completeRiver(ball); else completeRamp(ball); ball.contactCooldown = 15; }
   }
   function moveTable(ball: PinballBall, dt: number) {
     if (ball.mode === "air") {
@@ -239,7 +282,9 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
       if (hit.t === 0) remaining = Math.max(0, remaining - 0.00004);
     }
     if (ball.mode === "table" && ball.contactCooldown === 0 && ball.vy < -5.5 && ball.py >= -0.9 && ball.y <= -0.8 && Math.abs(ball.x + 2.75) < 0.53) {
-      ball.mode = "ramp"; ball.rampDistance = 0; ball.rampSpeed = Math.hypot(ball.vx, ball.vy); ball.vz = 0; announce("SKYLINE RAMP");
+      ball.mode = "ramp"; ball.rampDistance = 0; ball.rampSpeed = Math.hypot(ball.vx, ball.vy); ball.vz = 0; announce("ISLAND RAMP");
+    } else if (ball.mode === "table" && ball.contactCooldown === 0 && ball.vy < -6.5 && ball.py >= -0.9 && ball.y <= -0.8 && Math.abs(ball.x - 2.75) < 0.48) {
+      ball.mode = "river"; ball.rampDistance = 0; ball.rampSpeed = Math.hypot(ball.vx, ball.vy); ball.vz = 0; announce("RIVER ORBIT");
     }
   }
   return {
@@ -278,10 +323,10 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
         }
         // Snapshot the length: a ramp jackpot can add balls during this substep.
         const count = state.balls.length;
-        for (let i = 0; i < count; i++) { const b = state.balls[i]; if (b.mode === "ramp") moveRamp(b, dt); else if (b.mode !== "plunger") moveTable(b, dt); }
+        for (let i = 0; i < count; i++) { const b = state.balls[i]; if (b.mode === "ramp" || b.mode === "river") moveRamp(b, dt); else if (b.mode !== "plunger") moveTable(b, dt); }
         for (let i = 0; i < state.balls.length; i++) for (let j = i + 1; j < state.balls.length; j++) {
           const a = state.balls[i], b = state.balls[j];
-          if (a.mode === "plunger" || b.mode === "plunger" || a.mode === "ramp" || b.mode === "ramp" || Math.abs(a.z - b.z) > BALL_RADIUS * 1.5) continue;
+          if (a.mode === "plunger" || b.mode === "plunger" || a.mode === "ramp" || b.mode === "ramp" || a.mode === "river" || b.mode === "river" || Math.abs(a.z - b.z) > BALL_RADIUS * 1.5) continue;
           const dx = b.x - a.x, dy = b.y - a.y, distance = Math.hypot(dx, dy);
           if (distance > 0 && distance < BALL_RADIUS * 2) { const nx = dx / distance, ny = dy / distance, push = (BALL_RADIUS * 2 - distance) / 2; a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push; const v = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny; if (v < 0) { a.vx += v * nx * 0.93; a.vy += v * ny * 0.93; b.vx -= v * nx * 0.93; b.vy -= v * ny * 0.93; } }
         }

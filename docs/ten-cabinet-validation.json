@@ -1,0 +1,147 @@
+{
+  "fullUnitSuitePassed": 351,
+  "changedModelTargetedPassed": 23,
+  "browserInitial": {
+    "groups": 29,
+    "passed": 28,
+    "failures": [
+      {
+        "name": "neon-rally: actual desktop controls, 3D draws, and live screenshot",
+        "assertions": [],
+        "passed": false,
+        "error": "Page.wait_for_function: Timeout 8000ms exceeded.",
+        "durationSeconds": 9.717
+      }
+    ],
+    "errors": [],
+    "environment": {
+      "url": "http://127.0.0.1:5173",
+      "productionUrl": null,
+      "apiUrl": null,
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "headless": true,
+      "launchArgs": [
+        "--no-sandbox"
+      ],
+      "checkPattern": null,
+      "browser": "154.0.8037.57"
+    }
+  },
+  "rallyFocusedRerun": "passed",
+  "finalChangedGameBrowserGroups": 4,
+  "productionBeforeFinalVisualBatch": {
+    "checks": [
+      "automatic featured rotation observed",
+      "midnight-pinball: exact standalone production Worker renders and plays without DEV hooks",
+      "orbit-salvage: exact standalone production Worker renders and plays without DEV hooks",
+      "tidal-courier: exact standalone production Worker renders and plays without DEV hooks",
+      "prism-circuit: exact standalone production Worker renders and plays without DEV hooks",
+      "skybound-stack: exact standalone production Worker renders and plays without DEV hooks",
+      "canopy-sprint: exact standalone production Worker renders and plays without DEV hooks",
+      "packaged native Worker real D1 health",
+      "all ten real local D1 boards empty, no fabricated competitors"
+    ],
+    "errors": [],
+    "timing": {
+      "midnight-pinball": {
+        "meanMs": 69.31590909090909,
+        "p95Ms": 83.40000000000146
+      },
+      "orbit-salvage": {
+        "meanMs": 21.968181818181787,
+        "p95Ms": 33.39999999999782
+      },
+      "tidal-courier": {
+        "meanMs": 39.3931818181818,
+        "p95Ms": 50.10000000000218
+      },
+      "prism-circuit": {
+        "meanMs": 19.695454545454513,
+        "p95Ms": 33.30000000000291
+      },
+      "skybound-stack": {
+        "meanMs": 30.299999999999933,
+        "p95Ms": 50
+      },
+      "canopy-sprint": {
+        "meanMs": 35.98409090909097,
+        "p95Ms": 50
+      }
+    },
+    "environment": {
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "headless": true,
+      "args": [
+        "--no-sandbox"
+      ],
+      "physicalPhone": false,
+      "browser": "154.0.8037.57",
+      "gpuDriver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "passed": true
+  },
+  "productionFinalChangedGames": {
+    "checks": [
+      "automatic featured rotation observed",
+      "midnight-pinball: exact standalone production Worker renders and plays without DEV hooks",
+      "tidal-courier: exact standalone production Worker renders and plays without DEV hooks",
+      "packaged native Worker real D1 health",
+      "all ten real local D1 boards empty, no fabricated competitors"
+    ],
+    "errors": [],
+    "timing": {
+      "midnight-pinball": {
+        "meanMs": 115.9022727272727,
+        "p95Ms": 150.10000000000036
+      },
+      "tidal-courier": {
+        "meanMs": 49.9977272727273,
+        "p95Ms": 66.70000000000073
+      }
+    },
+    "environment": {
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "headless": true,
+      "args": [
+        "--no-sandbox"
+      ],
+      "physicalPhone": false,
+      "browser": "154.0.8037.57",
+      "gpuDriver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "passed": true
+  },
+  "pinballIsolatedFinal": {
+    "checks": [
+      "midnight-pinball: exact standalone production Worker renders and plays without DEV hooks",
+      "packaged native Worker real D1 health",
+      "all ten real local D1 boards empty, no fabricated competitors"
+    ],
+    "errors": [],
+    "timing": {
+      "midnight-pinball": {
+        "meanMs": 65.15,
+        "p95Ms": 83.39999999999964
+      }
+    },
+    "environment": {
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "headless": true,
+      "args": [
+        "--no-sandbox"
+      ],
+      "physicalPhone": false,
+      "browser": "154.0.8037.57",
+      "gpuDriver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "passed": true
+  },
+  "staticPinballOptimization": {
+    "drawCallsBefore": 233,
+    "drawCallsAfter": 54,
+    "geometriesBefore": 187,
+    "geometriesAfter": 52,
+    "trianglesUnchanged": 42618
+  },
+  "deployment": "pending coordinating publisher; no Sites publishing tools exposed in executor"
+}

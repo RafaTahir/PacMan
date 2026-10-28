@@ -1,0 +1,11 @@
+import { describe,it,expect } from 'vitest';
+import { Buttons, MAX_TICKS, NEUTRAL_INPUT } from '../src/arcade/shared/contracts';
+import { createSimulation, rotatedMask, traceCircuit } from '../src/arcade/games/prism-circuit/model';
+describe('Prism Circuit',()=>{
+ it('rotates connectors through all four orientations',()=>{expect([0,1,2,3].map(rotation=>rotatedMask({mask:3,rotation}))).toEqual([3,6,12,9]);});
+ it('generates solvable unsolved boards for many seeds',()=>{for(let seed=1;seed<80;seed++){const s=createSimulation(seed).state;expect(s.connected).toBe(false);expect(traceCircuit(s.size,s.tiles.map(t=>({...t,rotation:0}))).connected).toBe(true);}});
+ it('requires button edges, undoes changes and never scores a partial route',()=>{const game=createSimulation(12),s=game.state,initial=s.tiles[0].rotation;game.step({...NEUTRAL_INPUT,buttons:Buttons.PRIMARY});expect(s.tiles[0].rotation).toBe((initial+1)%4);game.step({...NEUTRAL_INPUT,buttons:Buttons.PRIMARY});expect(s.moves).toBe(1);game.step(NEUTRAL_INPUT);game.step({...NEUTRAL_INPUT,buttons:Buttons.SECONDARY});expect(s.tiles[0].rotation).toBe(initial);expect(s.score).toBe(0);});
+ it('repeats held directional input after a deliberate delay',()=>{const g=createSimulation(4);g.step({...NEUTRAL_INPUT,x:127});expect(g.state.selected).toBe(1);for(let i=0;i<17;i++)g.step({...NEUTRAL_INPUT,x:127});expect(g.state.selected).toBe(1);g.step({...NEUTRAL_INPUT,x:127});expect(g.state.selected).toBe(2);});
+ it('awards one completion, advances a board and bounds history',()=>{const game=createSimulation(7),s=game.state;s.tiles.forEach(t=>t.rotation=0);game.step(NEUTRAL_INPUT);expect(s.boards).toBe(1);expect(s.score).toBeGreaterThan(0);const score=s.score;for(let i=0;i<74;i++)game.step(NEUTRAL_INPUT);expect(s.score).toBe(score);game.step(NEUTRAL_INPUT);expect(s.connected).toBe(false);expect(s.history.length).toBe(0);});
+ it('replays deterministically and stops its clock after the shift',()=>{const a=createSimulation(22),b=createSimulation(22);for(let i=0;i<MAX_TICKS;i++){const input={...NEUTRAL_INPUT,x:i%70<35?127:-127,buttons:i%15===0?Buttons.PRIMARY:0};a.step(input);b.step(input);}expect(a.state).toEqual(b.state);expect(a.state.status).not.toBe('playing');a.step(NEUTRAL_INPUT);expect(a.state.tick).toBe(MAX_TICKS);});
+});

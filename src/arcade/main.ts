@@ -152,7 +152,7 @@ function homeNow() {
   document.body.classList.remove("playing-pacman");
   document.title = "After Hours Arcade · One more round.";
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-  showroom = new Showroom($("showroom"), preference.reducedMotion); updateBests();
+  showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex); updateBests();
   void board.refresh(true); $("home-brand").focus({ preventScroll: true });
 }
 function requestSwitch(action: () => void) {
@@ -186,7 +186,7 @@ function settingsChanged() {
   $("play-mute-button").setAttribute("aria-label", preference.muted ? "Enable sound" : "Mute sound");
   $("play-mute-button").setAttribute("aria-pressed", String(preference.muted));
   const label = $("play-mute-button").querySelector(".button-label"); if (label) label.textContent = preference.muted ? "Muted" : "Sound";
-  if (!$("arcade-home").hidden) { showroom?.dispose(); showroom = new Showroom($("showroom"), preference.reducedMotion); }
+  if (!$("arcade-home").hidden) { showroom?.dispose(); showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex); }
 }
 function showHelp() {
   if (pacman) {
@@ -253,7 +253,33 @@ $("score-initials").addEventListener("input", event => {
 for (const button of document.querySelectorAll<HTMLElement>("[data-game]")) button.addEventListener("click", () => requestSwitch(() => void launch(button.dataset.game as GameId)));
 for (const id of ["play-pause-button", "play-restart-button", "play-mute-button", "play-help-button", "play-fullscreen-button", "play-settings-button"])
   $(id).addEventListener("pointerdown", event => { if (pacman) event.preventDefault(); });
-$("quick-play").addEventListener("click", () => requestSwitch(() => void launch("pacman")));
+let featuredIndex = 0;
+const featuredPanel = document.querySelector<HTMLElement>(".hero-panel")!;
+function showFeatured(index: number) {
+  featuredIndex = (index + cabinets.length) % cabinets.length;
+  const cabinet = cabinets[featuredIndex];
+  $("hero-title").textContent = cabinet.title;
+  $("featured-copy").textContent = `${cabinet.genre} · ${cabinet.copy}`;
+  $("featured-play-label").textContent = `Play ${cabinet.title}`;
+  $("featured-caption").textContent = `FEATURED · ${cabinet.title}`;
+  $("featured-position").textContent = `${String(featuredIndex + 1).padStart(2, "0")} / ${String(cabinets.length).padStart(2, "0")}`;
+  featuredPanel.style.setProperty("--featured-accent", cabinet.accent);
+  showroom?.setFeatured(featuredIndex);
+}
+$("featured-previous").addEventListener("click", () => showFeatured(featuredIndex - 1));
+$("featured-next").addEventListener("click", () => showFeatured(featuredIndex + 1));
+$("quick-play").addEventListener("click", () => requestSwitch(() => void launch(cabinets[featuredIndex].id)));
+let autoRotate = true;
+$("featured-toggle").addEventListener("click", () => {
+  autoRotate = !autoRotate;
+  $("featured-toggle").textContent = autoRotate ? "Pause rotation" : "Rotate features";
+  $("featured-toggle").setAttribute("aria-pressed", String(!autoRotate));
+});
+const featuredTimer = window.setInterval(() => {
+  if (autoRotate && !document.hidden && !$("arcade-home").hidden && !preference.reducedMotion && !matchMedia("(prefers-reduced-motion: reduce)").matches && !featuredPanel.matches(":hover, :focus-within")) showFeatured(featuredIndex + 1);
+}, 7000);
+window.addEventListener("pagehide", () => clearInterval(featuredTimer), { once: true });
+showFeatured(0);
 $("home-brand").addEventListener("click", event => { event.preventDefault(); if (selected) requestSwitch(homeNow); });
 $("play-home-button").addEventListener("click", () => requestSwitch(homeNow));
 $("play-start-button").addEventListener("click", () => void active()?.start("ranked"));

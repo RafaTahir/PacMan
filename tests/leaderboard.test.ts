@@ -6,14 +6,11 @@ import { tmpdir } from "node:os";
 import { handleRequest, MAX_BODY_BYTES, pruneExpired } from "../server/app";
 import worker from "../server/index";
 import type { D1Database, D1Result, D1Statement, Env, SqlValue } from "../server/d1";
-import { replayScore, runLimits, validateReplay } from "../server/replay";
+import { replayScore, runLimits, validateReplay, simulationFactories } from "../server/replay";
 import { validateInitials } from "../server/initials";
 import { GAME_IDS, NEUTRAL_INPUT, RULESET_VERSION, type ArcadeInput, type GameId, type ReplayInput } from "../src/arcade/shared/contracts";
-import { createSimulation as rally } from "../src/arcade/games/neon-rally/model";
-import { createSimulation as breaker } from "../src/arcade/games/reactor-breaker/model";
-import { createSimulation as siege } from "../src/arcade/games/chrome-siege/model";
-import { createSimulation as pinball } from "../src/arcade/games/midnight-pinball/model";
 import { Game } from "../src/engine";
+import { isAdditionalCabinet } from "../server/cabinet-store";
 import { TICK_SECONDS } from "../src/levels";
 
 class SQLiteD1 implements D1Database {
@@ -113,7 +110,7 @@ function completed(game: GameId, seed: number, input: ArcadeInput = { ...NEUTRAL
     while (frames < runLimits(game).maxTicks && simulation.state.phase !== "game-over") { simulation.update(TICK_SECONDS); simulation.drainEvents(); frames++; }
     score = simulation.state.score;
   } else {
-    const simulation = { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball }[game](seed);
+    const simulation = simulationFactories[game](seed);
     while (frames < runLimits(game).maxTicks && simulation.state.status === "playing") { simulation.step(input); frames++; }
     score = simulation.state.score;
   }
@@ -176,7 +173,7 @@ describe("persistent D1 leaderboards", () => {
     expect(Number.isInteger(result.score)).toBe(true);
     const board = await bodyOf(await request(`/api/leaderboards?game=${game}`));
     expect(board.entries).toEqual([result.entry]);
-    expect(db.sqlite.prepare("SELECT status FROM runs WHERE id = ?").get(run.runId)?.status).toBe("accepted");
+    expect(db.sqlite.prepare(`SELECT status FROM ${isAdditionalCabinet(game) ? "cabinet_runs" : "runs"} WHERE id = ?`).get(run.runId)?.status).toBe("accepted");
     expect(db.statements.every((sql) => !sql.includes(";") && !/\bCREATE\b/i.test(sql))).toBe(true);
   });
   it("keeps duplicate guest initials and ranks actual scores with deterministic ties", async () => {
@@ -502,5 +499,70 @@ describe("replay and API input boundaries", () => {
     expect((await request("/api/leaderboards?game=pacman", {})).status).toBe(405);
     env.ASSETS = { fetch: async () => new Response("actual assets") };
     expect(await (await request("/index.html")).text()).toBe("actual assets");
+  });
+});
+
+
+describe("additive ten-cabinet storage", () => {
+  it("applies the new schema without changing legacy accepted rows, schema or foreign keys", () => {
+    const legacy = new DatabaseSync(":memory:");
+    try {
+      legacy.exec("PRAGMA foreign_keys = ON");
+      for (const file of ["0000_initial_leaderboards.sql", "0001_recoverable_claims_and_pending_expiry.sql"])
+        legacy.exec(readFileSync(join("drizzle", file), "utf8"));
+      // Test-only accepted history: score derives from the original Pac-Man model.
+      const historic = completed("pacman", 2718);
+      legacy.prepare("INSERT INTO runs(id,game,ruleset,seed,issued_at,expires_at,status) VALUES(?,?,?,?,?,?,?)")
+        .run("historic-test-run", "pacman", "after-hours-v1", 2718, 1, 20, "accepted");
+      legacy.prepare("INSERT INTO scores VALUES(?,?,?,?,?,?,?,?,?)")
+        .run("historic-test-run", "pacman", "after-hours-v1", "TST", historic.score, historic.frames, 10, "2026-10-25", "test-only-history");
+      const beforeRuns = legacy.prepare("SELECT * FROM runs").all();
+      const beforeScores = legacy.prepare("SELECT * FROM scores").all();
+      const beforeSchema = legacy.prepare("SELECT type,name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name").all();
+      const migration = readFileSync("drizzle/0002_additional_cabinets.sql", "utf8");
+      for (const statement of migration.replaceAll("--> statement-breakpoint", "").split(";").map(s => s.trim()).filter(Boolean))
+        expect(statement).toMatch(/^CREATE (?:TABLE|INDEX) /);
+      legacy.exec(migration);
+      expect(legacy.prepare("SELECT * FROM runs").all()).toEqual(beforeRuns);
+      expect(legacy.prepare("SELECT * FROM scores").all()).toEqual(beforeScores);
+      for (const row of beforeSchema) expect(legacy.prepare("SELECT type,name,sql FROM sqlite_master WHERE name = ?").get(row.name as string)).toEqual(row);
+      expect(legacy.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      expect(() => legacy.prepare("INSERT INTO cabinet_scores VALUES(?,?,?,?,?,?,?,?,?)")
+        .run("missing-run", "orbit-salvage", RULESET_VERSION, "TST", 1, 1, 1, "2026-10-25", "hash")).toThrow();
+      expect(legacy.prepare("SELECT count(*) AS n FROM cabinet_scores").get()?.n).toBe(0);
+    } finally { legacy.close(); }
+  });
+  it.each(GAME_IDS.filter(isAdditionalCabinet))("rejects a forged score for added cabinet %s without creating a leaderboard row", async (game) => {
+    const run = await start(game);
+    const replay = completed(game, run.seed);
+    const response = await finish(run, "TST", { ...replay, score: replay.score + 1 });
+    expect(response.status).toBe(422);
+    expect(await bodyOf(response)).toMatchObject({ error: { code: "score_mismatch" } });
+    expect(db.sqlite.prepare("SELECT status FROM cabinet_runs WHERE id = ?").get(run.runId)?.status).toBe("rejected");
+    expect(db.sqlite.prepare("SELECT count(*) AS n FROM cabinet_scores").get()?.n).toBe(0);
+  });
+  it("keeps an added-cabinet accepted result durable and rejects conflicting duplicate submissions", async () => {
+    const run = await start("orbit-salvage");
+    const replay = completed(run.game, run.seed);
+    const accepted = await bodyOf(await finish(run, "SUN", replay));
+    const retry = await request(`/api/runs/${run.runId}/finish`, { initials: "SUN", ...replay });
+    expect(retry.status).toBe(200);
+    expect(await bodyOf(retry)).toMatchObject({ accepted: true, replayed: true, score: accepted.score });
+    expect((await request(`/api/runs/${run.runId}/finish`, { initials: "SEA", ...replay })).status).toBe(409);
+    expect(db.sqlite.prepare("SELECT count(*) AS n FROM cabinet_scores").get()?.n).toBe(1);
+    expect(db.sqlite.prepare("SELECT count(*) AS n FROM scores").get()?.n).toBe(0);
+    clock += 90 * 24 * 3600 * 1000;
+    await pruneExpired(db, clock);
+    const board = await bodyOf(await request("/api/leaderboards?game=orbit-salvage&scope=all"));
+    expect(board.entries).toEqual([accepted.entry]);
+    expect(db.sqlite.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+  it("rejects a stale pending ruleset while leaving accepted history readable", async () => {
+    const run = await start("midnight-pinball");
+    db.sqlite.prepare("UPDATE runs SET ruleset = 'after-hours-v1' WHERE id = ?").run(run.runId);
+    const result = await request(`/api/runs/${run.runId}/finish`, { initials: "TST", frames: 1, inputs: [] });
+    expect(result.status).toBe(409);
+    expect(await bodyOf(result)).toMatchObject({ error: { code: "ruleset_mismatch" } });
+    expect(db.sqlite.prepare("SELECT status FROM runs WHERE id = ?").get(run.runId)?.status).toBe("issued");
   });
 });
