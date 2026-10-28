@@ -6,6 +6,8 @@ import type { ReplayInput } from "./arcade/shared/contracts";
 
 export const PACMAN_BRIDGE = "afterhours:pacman:v1";
 export const PACMAN_MAX_TICKS = Math.floor(120 / TICK_SECONDS);
+export type PacmanGraphics = "webgl" | "canvas-fallback";
+export const isPacmanGraphics = (value: unknown): value is PacmanGraphics => value === "webgl" || value === "canvas-fallback";
 export interface PacmanSettings { muted: boolean; reducedMotion: boolean; highContrast: boolean }
 export interface PacmanHud { score: number; level: number; lives: number; remaining: number; frames: number; paused: boolean; phase: string }
 export interface PacmanFinished { score: number; frames: number; inputs: ReplayInput[]; victory: boolean }
@@ -15,8 +17,8 @@ export type HostCommand =
   | { type: "pause" | "toggle-pause" | "help" | "dispose" }
   | { type: "settings"; settings: PacmanSettings };
 export type ChildMessage =
-  | { type: "ready" }
-  | { type: "status"; session: number; phase: string; hud: PacmanHud; countdown?: number }
+  | { type: "ready"; graphics?: PacmanGraphics }
+  | { type: "status"; session: number; phase: string; hud: PacmanHud; countdown?: number; graphics?: PacmanGraphics }
   | { type: "finished"; session: number; result: PacmanFinished }
   | { type: "restart" | "menu" | "fullscreen"; session: number };
 

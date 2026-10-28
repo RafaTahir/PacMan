@@ -1,0 +1,160 @@
+{
+  "unitTargetedPassed": 34,
+  "browserFinalTargeted": {
+    "checks": [
+      {
+        "name": "webgl2 denied: upfront lobby, changing static art, real Pac-Man mode, 1280px layout",
+        "passed": true,
+        "detail": {
+          "width": 1280,
+          "height": 900,
+          "scrollWidth": 1280,
+          "scrollHeight": 1781,
+          "controls": [
+            {
+              "name": "home-brand",
+              "width": 188.96875,
+              "height": 56
+            },
+            {
+              "name": "settings-button",
+              "width": 105.40625,
+              "height": 44
+            },
+            {
+              "name": "quick-play",
+              "width": 175.796875,
+              "height": 50
+            },
+            {
+              "name": "featured-toggle",
+              "width": 96.9375,
+              "height": 44
+            },
+            {
+              "name": "featured-previous",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "featured-next",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "leaderboard-game",
+              "width": 162,
+              "height": 44
+            },
+            {
+              "name": "leaderboard-scope",
+              "width": 126,
+              "height": 44
+            },
+            {
+              "name": "leaderboard-refresh",
+              "width": 44,
+              "height": 44
+            },
+            {
+              "name": "pacman",
+              "width": 227.1875,
+              "height": 368
+            },
+            {
+              "name": "neon-rally",
+              "width": 227.203125,
+              "height": 368
+            },
+            {
+              "name": "reactor-breaker",
+              "width": 227.203125,
+              "height": 368
+            },
+            {
+              "name": "chrome-siege",
+              "width": 227.203125,
+              "height": 368
+            },
+            {
+              "name": "midnight-pinball",
+              "width": 227.1875,
+              "height": 368
+            },
+            {
+              "name": "orbit-salvage",
+              "width": 227.1875,
+              "height": 364
+            },
+            {
+              "name": "tidal-courier",
+              "width": 227.203125,
+              "height": 364
+            },
+            {
+              "name": "prism-circuit",
+              "width": 227.203125,
+              "height": 364
+            },
+            {
+              "name": "skybound-stack",
+              "width": 227.203125,
+              "height": 364
+            },
+            {
+              "name": "canopy-sprint",
+              "width": 227.1875,
+              "height": 364
+            }
+          ],
+          "pacmanGraphics": "3D",
+          "pacmanCopy": "The original maze with 3D mesh graphics, sound and two-player classic. Choose a two-minute global challenge or classic local play."
+        }
+      },
+      {
+        "name": "normal WebGL: context-loss fallback, pinball objectives/layout and durable score-saving states",
+        "passed": true,
+        "detail": {
+          "localResult": "local only",
+          "rankedResult": "pending\u2192verifying\u2192error\u2192saved (HTTP fixtures)",
+          "pinballObjective": "goals and tilt",
+          "lobbyContextLoss": "static art restored"
+        }
+      }
+    ],
+    "errors": [],
+    "fixtures": [
+      "Intercepted empty leaderboard, ranked tickets and result responses; no real API writes.",
+      "Injected WebGL2-only and all-WebGL denial in every document/frame.",
+      "DEV-only terminal fixture for score UI; no forged simulation score."
+    ],
+    "environment": {
+      "url": "http://127.0.0.1:5173",
+      "headless": true,
+      "launchArgs": [
+        "--no-sandbox"
+      ],
+      "physicalPhone": false,
+      "browser": "154.0.8037.57"
+    },
+    "passed": true
+  },
+  "productionArtifact": {
+    "checks": [
+      "exact production artifact: normal lobby, true Pac-Man3D copy",
+      "exact production artifact: live pinball objectives and honest practice status",
+      "exact production artifact: all-WebGL-blocked mobile static lobby, requirements, true Pac-Man2D copy"
+    ],
+    "errors": [],
+    "fixtures": [
+      "Graphics denial injected, no score writes."
+    ],
+    "headless": true,
+    "physicalPhone": false,
+    "browser": "154.0.8037.57",
+    "passed": true
+  },
+  "databaseChanges": false,
+  "gameSimulationChanges": false,
+  "deployment": "pending coordinating Sites publisher"
+}

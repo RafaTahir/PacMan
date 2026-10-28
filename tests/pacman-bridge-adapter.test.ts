@@ -61,6 +61,52 @@ describe("Pac-Man iframe host boundary", () => {
     expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.any(String));
   });
 
+  it("keeps older children playable without claiming unreported 3D graphics", () => {
+    send("ready");
+    const copy = callbacks.overlay.mock.lastCall?.[2];
+    expect(copy).toContain("graphics selected by your browser");
+    expect(copy).not.toMatch(/mesh|3D/);
+    expect(adapter.phase).toBe("intro");
+  });
+
+  it.each([
+    ["webgl", "3D mesh graphics"],
+    ["canvas-fallback", "2D fallback graphics (3D is unavailable in this browser)"],
+  ])("describes the actual %s child renderer in opening copy", (graphics, copy) => {
+    send("ready", { graphics });
+    expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.stringContaining(copy));
+  });
+
+  it("ignores malformed graphics handshakes and graphics reports from a different frame/origin", () => {
+    for (const graphics of ["webgl2", "3D", true, null, { backend: "webgl" }]) send("ready", { graphics });
+    send("ready", { graphics: "webgl" }, "https://other.test");
+    send("ready", { graphics: "webgl" }, "https://arcade.test", {});
+    expect(adapter.phase).toBe("loading");
+    send("ready", { graphics: "canvas-fallback" });
+    expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.stringContaining("2D fallback"));
+  });
+
+  it("refreshes opening copy when the child reports graphics loss or recovery before play", () => {
+    send("ready", { graphics: "webgl" });
+    send("ready", { graphics: "canvas-fallback" });
+    expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.stringContaining("2D fallback"));
+    send("ready", { graphics: "webgl" });
+    expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.stringContaining("3D mesh"));
+  });
+
+  it("validates status graphics and retains the actual backend for returning to the menu", async () => {
+    send("ready", { graphics: "webgl" });
+    await adapter.start("practice");
+    const hud = { score: 0, level: 1, lives: 3, remaining: 244, frames: 1, paused: true, phase: "playing" };
+    send("status", { session: 1, phase: "paused", hud, graphics: "made-up" });
+    expect(adapter.phase).toBe("playing");
+    expect(callbacks.hud).not.toHaveBeenCalled();
+    send("status", { session: 1, phase: "paused", hud, graphics: "canvas-fallback" });
+    expect(adapter.phase).toBe("paused");
+    send("menu", { session: 1 });
+    expect(callbacks.overlay).toHaveBeenLastCalledWith("intro", "PAC-MAN", expect.stringContaining("2D fallback"));
+  });
+
   it("uses the server-issued identity, ignores stale/duplicate results and issues a new restart challenge", async () => {
     const first = challenge("server-one", 11);
     const second = challenge("server-two", 22);

@@ -4,6 +4,7 @@ import { cabinets } from "./catalog";
 import { ArcadeController, type FinishedRun } from "./controller";
 import { ArcadeSound } from "./audio";
 import { Leaderboard } from "./leaderboard";
+import { supportsWebGL2 } from "./capabilities";
 import { Showroom } from "./showroom";
 import { PacmanAdapter } from "./pacman-adapter";
 import { ApiError, submitRun } from "./api";
@@ -13,6 +14,17 @@ import { MAX_TICKS, TICK_RATE, type ArcadeSimulation, type GameDefinition, type 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
   const value = document.getElementById(id); if (!value) throw new Error(`Missing arcade interface: ${id}`); return value as T;
 };
+const webgl2Available = supportsWebGL2();
+if (!webgl2Available) {
+  document.body.classList.add("webgl2-unavailable");
+  $("graphics-capability").hidden = false;
+  $("graphics-capability").textContent = "WebGL 2 is unavailable in this browser. PAC-MAN can use its 2D fallback; the other nine cabinets require WebGL 2. You can still browse every global leaderboard.";
+  for (const card of document.querySelectorAll<HTMLElement>('[data-game]:not([data-game="pacman"])')) {
+    card.setAttribute("aria-describedby", "graphics-capability");
+    const badge = document.createElement("span"); badge.className = "cabinet-capability";
+    badge.textContent = "Needs WebGL 2"; card.append(badge);
+  }
+}
 const audio = new ArcadeSound();
 const board = new Leaderboard();
 let selected: GameId | null = null;
@@ -71,11 +83,17 @@ function showOverlay(phase: string, title: string, copy: string, countdown = 0) 
   const label = $("play-pause-button").querySelector(".button-label");
   if (label) label.textContent = phase === "paused" ? "Resume" : phase === "countdown" ? "Keep paused" : "Pause";
   if (phase === "countdown") announce(`Resuming in ${countdown}. Choose your direction.`);
+  updateMode();
   if (["intro", "paused"].includes(phase) && !childOwns)
     requestAnimationFrame(() => { if (!modalOpen()) $(phase === "intro" ? "play-start-button" : "play-resume-button").focus({ preventScroll: true }); });
 }
 function updateMode() {
   const game = active();
+  const savingCopy = !game || ["intro", "loading", "preparing"].includes(game.phase)
+    ? "Ranked: post to the global board after your run. Practice: local best only."
+    : game.ranked ? "Global score not posted yet · finish, enter initials and save."
+    : "Practice · local best on this device · no global submission.";
+  if (game?.phase !== "ended" && $("score-save-status").textContent !== savingCopy) $("score-save-status").textContent = savingCopy;
   $("play-mode").textContent = !game || ["intro", "loading"].includes(game.phase) ? "FREE PLAY · CHOOSE YOUR RUN"
     : game.ranked ? "RANKED · REPLAY CHECKED · 2 MIN" : selected === "pacman" ? "CLASSIC LOCAL · ON THIS DEVICE" : "LOCAL PRACTICE · ON THIS DEVICE";
 }
@@ -85,6 +103,12 @@ function updateHud(definition: GameDefinition, simulation: ArcadeSimulation) {
   const all = definition.hud(simulation);
   const important = all.filter(item => item.kind);
   const extra = (important.length ? important : all).slice(0, 3);
+  if (definition.id === "midnight-pinball") {
+    const tour = all.find(item => item.label === "ISLAND TOUR");
+    const table = all.find(item => item.label === "TILT" || item.label === "TABLE");
+    $("play-objective").textContent = table?.label === "TILT" ? "TILT · flippers disabled until the next ball."
+      : `3 stars → left ramp: multiball. Left ramp + right river: Island Tour. ${tour?.value ?? ""}`;
+  }
   const seconds = Math.max(0, Math.ceil((MAX_TICKS - simulation.state.tick) / TICK_RATE));
   const signature = `${score}:${seconds}:${extra.map(item => `${item.label}:${item.value}`).join("|")}`;
   if (signature === hudSignature) return; hudSignature = signature;
@@ -104,6 +128,9 @@ function releaseGame() {
 async function launch(id: GameId) {
   releaseGame(); showroom?.dispose(); showroom = null;
   selected = id; const version = revision;
+  $("play-objective").hidden = id !== "midnight-pinball";
+  $("play-objective").textContent = id === "midnight-pinball" ? "3 stars → left ramp: multiball. Left ramp + right river: Island Tour." : "";
+  $("score-save-status").textContent = "Choose ranked for global scores, or practice for a local best.";
   $("arcade-home").hidden = true; $("arcade-play").hidden = false;
   const cabinet = cabinets.find(item => item.id === id)!;
   document.title = `${cabinet.title} · After Hours Arcade`;
@@ -130,6 +157,13 @@ async function launch(id: GameId) {
     pacman.settings(preference);
     updateMode(); return;
   }
+  if (!webgl2Available) {
+    $("touch-controls").hidden = true;
+    showOverlay("unavailable", `${cabinet.title} needs WebGL 2.`, "This browser cannot open this 3D cabinet. PAC-MAN can use its graphics fallback, and all global leaderboards remain available from the arcade.");
+    $("play-objective").hidden = true;
+    $("score-save-status").textContent = "No run started · no score to save.";
+    return;
+  }
   $("touch-controls").hidden = false;
   const game = new ArcadeController(id as NewGameId, $("play-stage"), audio, {
     overlay: showOverlay, hud: updateHud, result: showResult, notice, isModalOpen: modalOpen,
@@ -152,7 +186,7 @@ function homeNow() {
   document.body.classList.remove("playing-pacman");
   document.title = "After Hours Arcade · One more round.";
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-  showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex); updateBests();
+  showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex, webgl2Available); updateBests();
   void board.refresh(true); $("home-brand").focus({ preventScroll: true });
 }
 function requestSwitch(action: () => void) {
@@ -186,7 +220,7 @@ function settingsChanged() {
   $("play-mute-button").setAttribute("aria-label", preference.muted ? "Enable sound" : "Mute sound");
   $("play-mute-button").setAttribute("aria-pressed", String(preference.muted));
   const label = $("play-mute-button").querySelector(".button-label"); if (label) label.textContent = preference.muted ? "Muted" : "Sound";
-  if (!$("arcade-home").hidden) { showroom?.dispose(); showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex); }
+  if (!$("arcade-home").hidden) { showroom?.dispose(); showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex, webgl2Available); }
 }
 function showHelp() {
   if (pacman) {
@@ -215,6 +249,7 @@ async function toggleFullscreen() {
 function showResult(finished: FinishedRun) {
   if (finished.game !== selected) return;
   result = finished; resultAccepted = false; submitting = false;
+  $("score-save-status").textContent = finished.run ? "Global score not saved · enter initials and choose Save global score." : "Practice complete · local best only · no global score submitted.";
   saveBest(finished.game, finished.score); updateBests();
   $("result-title").textContent = finished.victory ? "Night well spent." : "One more round?";
   $("result-score").textContent = finished.score.toLocaleString();
@@ -232,16 +267,19 @@ $("score-form").addEventListener("submit", async event => {
   if (!/^[A-Z]{3}$/.test(initials)) { $("score-feedback").textContent = "Enter exactly three letters, A–Z."; $("score-initials").focus(); return; }
   submitting = true; $<HTMLButtonElement>("score-submit").disabled = true;
   $("score-feedback").textContent = "Checking your replay and saving the real score…";
+  $("score-save-status").textContent = "Global score · verifying replay and saving…";
   const snapshot = result;
   try {
     const accepted = await submitRun(snapshot.run!, initials, snapshot.frames, snapshot.inputs, snapshot.score);
     if (result !== snapshot) return;
     resultAccepted = true; store.set("initials", accepted.entry.initials);
     $("score-feedback").textContent = "Saved to the persistent global leaderboard. Available to players on every device.";
+    $("score-save-status").textContent = "Global score saved · available across devices.";
     $("score-submit").textContent = "Score saved"; $<HTMLInputElement>("score-initials").disabled = true;
     board.select(snapshot.game); announce("Your replay-checked score is on the global board.");
   } catch (error) {
     if (result !== snapshot) return;
+    $("score-save-status").textContent = "Global score not saved · see the result message for next steps.";
     $("score-feedback").textContent = `${error instanceof Error ? error.message : "The score could not be submitted."} Your local best is saved.`;
     if (error instanceof ApiError && ["run_expired", "ruleset_mismatch", "invalid_replay", "score_mismatch"].includes(error.code)) $("score-submit").hidden = true;
     else $<HTMLButtonElement>("score-submit").disabled = false;
@@ -260,7 +298,7 @@ function showFeatured(index: number) {
   const cabinet = cabinets[featuredIndex];
   $("hero-title").textContent = cabinet.title;
   $("featured-copy").textContent = `${cabinet.genre} · ${cabinet.copy}`;
-  $("featured-play-label").textContent = `Play ${cabinet.title}`;
+  $("featured-play-label").textContent = !webgl2Available && cabinet.id !== "pacman" ? "View requirements" : `Play ${cabinet.title}`;
   $("featured-caption").textContent = `FEATURED · ${cabinet.title}`;
   $("featured-position").textContent = `${String(featuredIndex + 1).padStart(2, "0")} / ${String(cabinets.length).padStart(2, "0")}`;
   featuredPanel.style.setProperty("--featured-accent", cabinet.accent);
@@ -284,7 +322,7 @@ $("home-brand").addEventListener("click", event => { event.preventDefault(); if 
 $("play-home-button").addEventListener("click", () => requestSwitch(homeNow));
 $("play-start-button").addEventListener("click", () => void active()?.start("ranked"));
 $("play-practice-button").addEventListener("click", () => {
-  if (controller?.phase === "unavailable") void launch("pacman"); else void active()?.start("practice");
+  if (!active() || controller?.phase === "unavailable") void launch("pacman"); else void active()?.start("practice");
 });
 guardedActivation($("play-resume-button"), () => active()?.togglePause());
 $("play-keep-paused").addEventListener("click", () => active()?.pause());

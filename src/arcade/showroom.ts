@@ -2,16 +2,22 @@ import * as THREE from "three";
 import { cabinets } from "./catalog";
 import { Stage } from "./scene";
 
-/** One inexpensive 3D scene for the five cabinets; never five game contexts. */
+/** One bounded lobby preview, with original vector artwork when 3D cannot open. */
 export class Showroom {
   private stage: Stage | null = null;
   private frame = 0;
   private disposed = false;
   private readonly groups: THREE.Group[] = [];
+  private fallback: HTMLDivElement | null = null;
+  private featured = 0;
   private readonly cabinetBounds = new THREE.Box3();
-  constructor(private mount: HTMLElement, private reducedMotion: boolean, featured = 0) {
+  constructor(private mount: HTMLElement, private reducedMotion: boolean, featured = 0, render3D = true) {
+    this.featured = featured;
+    mount.classList.remove("showroom-fallback");
+    mount.querySelector(".showroom-static")?.remove();
+    if (!render3D) { this.showStatic(); return; }
     try {
-      this.stage = new Stage(mount, () => this.dispose(), () => {});
+      this.stage = new Stage(mount, () => { if (!this.disposed) this.showStatic(); }, () => {});
       const { scene, camera } = this.stage;
       scene.background = new THREE.Color(0x080b12);
       camera.position.set(12, 10, 18); camera.lookAt(0, 1.4, 0);
@@ -46,9 +52,35 @@ export class Showroom {
         this.cabinetBounds.expandByObject(group);
       });
       this.setFeatured(featured); this.draw();
-    } catch { mount.classList.add("showroom-fallback"); mount.setAttribute("aria-label", "Arcade cabinets, open for one more round."); }
+    } catch { this.showStatic(); }
+  }
+  private showStatic(): void {
+    const stage = this.stage; this.stage = null; stage?.dispose();
+    if (this.disposed) return;
+    this.mount.classList.add("showroom-fallback");
+    if (!this.fallback) {
+      this.fallback = document.createElement("div"); this.fallback.className = "showroom-static";
+      this.mount.append(this.fallback);
+    }
+    this.renderStatic();
+  }
+  private renderStatic(): void {
+    if (!this.fallback) return;
+    const cabinet = cabinets[this.featured];
+    const art = document.querySelector(`[data-game="${cabinet.id}"] .cabinet-art svg`);
+    const screen = document.createElement("div"); screen.className = "static-cabinet-screen";
+    if (art) screen.append(art.cloneNode(true));
+    else { const glyph = document.createElement("span"); glyph.textContent = cabinet.glyph; screen.append(glyph); }
+    const marquee = document.createElement("strong"); marquee.textContent = cabinet.title;
+    const label = document.createElement("span"); label.className = "static-preview-label"; label.textContent = "STATIC CABINET PREVIEW";
+    const base = document.createElement("div"); base.className = "static-cabinet-base";
+    base.append(document.createElement("i"), document.createElement("i"), document.createElement("i"));
+    this.fallback.style.setProperty("--preview-accent", cabinet.accent);
+    this.fallback.replaceChildren(label, marquee, screen, base);
   }
   setFeatured(index: number): void {
+    this.featured = (index + cabinets.length) % cabinets.length;
+    if (!this.stage) { this.renderStatic(); return; }
     this.cabinetBounds.makeEmpty();
     this.groups.forEach((group, i) => {
       const offset = (i - index + cabinets.length) % cabinets.length;
@@ -95,5 +127,5 @@ export class Showroom {
     // Cabinet art is a static real-geometry scene. Redraw only for resize;
     // no idle WebGL animation loop competes with gameplay on mobile.
   };
-  dispose(): void { this.disposed = true; cancelAnimationFrame(this.frame); this.stage?.dispose(); this.stage = null; }
+  dispose(): void { this.disposed = true; cancelAnimationFrame(this.frame); this.stage?.dispose(); this.stage = null; this.fallback?.remove(); this.fallback = null; }
 }

@@ -1,6 +1,6 @@
 import { issueRun, type RankedRun } from "./api";
 import type { FinishedRun } from "./controller";
-import { PACMAN_BRIDGE, isBridgeEnvelope, isPacmanFinished, isPacmanHud, type HostCommand, type PacmanHud, type PacmanSettings } from "../pacman-host";
+import { PACMAN_BRIDGE, isBridgeEnvelope, isPacmanFinished, isPacmanHud, isPacmanGraphics, type PacmanGraphics, type HostCommand, type PacmanHud, type PacmanSettings } from "../pacman-host";
 
 export interface PacmanCallbacks {
   overlay: (phase: string, title: string, copy: string, countdown?: number) => void;
@@ -17,6 +17,7 @@ export class PacmanAdapter {
   phase = "loading";
   ranked: RankedRun | null = null;
   private ready = false;
+  private graphics: PacmanGraphics | null = null;
   private revision = 0;
   private session = 0;
   private delivered = false;
@@ -114,6 +115,11 @@ export class PacmanAdapter {
     this.ranked = null;
   }
 
+  private introCopy(): string {
+    const graphics = this.graphics === "webgl" ? "3D mesh graphics" : this.graphics === "canvas-fallback"
+      ? "2D fallback graphics (3D is unavailable in this browser)" : "graphics selected by your browser";
+    return `The original maze with ${graphics}, sound and two-player classic. Choose a two-minute global challenge or classic local play.`;
+  }
   private isDisposed(): boolean { return this.phase === "disposed"; }
   private post(command: HostCommand): void { this.iframe.contentWindow?.postMessage({ channel: PACMAN_BRIDGE, ...command }, this.origin); }
   private loaded = (): void => { this.post({ type: "hello" }); };
@@ -131,19 +137,22 @@ export class PacmanAdapter {
     if (this.isDisposed() || event.origin !== this.origin || event.source !== this.iframe.contentWindow || !isBridgeEnvelope(event.data)) return;
     const message = event.data;
     if (message.type === "ready") {
+      if (message.graphics !== undefined && !isPacmanGraphics(message.graphics)) return;
+      if (isPacmanGraphics(message.graphics)) this.graphics = message.graphics;
       this.ready = true;
       clearTimeout(this.timeout);
       this.resolveWaiters(true);
       if (this.pendingSettings) this.post({ type: "settings", settings: this.pendingSettings });
-      if (this.phase === "loading") {
+      if (this.phase === "loading" || this.phase === "intro") {
         this.phase = "intro";
-        this.callbacks.overlay("intro", "PAC-MAN", "The original maze, mesh graphics, sound and two-player classic. Choose a two-minute global challenge or classic local play.");
+        this.callbacks.overlay("intro", "PAC-MAN", this.introCopy());
       }
       return;
     }
     if (message.session !== this.session || this.session === 0) return;
     if (message.type === "status" && isPacmanHud(message.hud) && typeof message.phase === "string" && ["intro", "playing", "paused", "countdown", "ended"].includes(message.phase)) {
-      if (this.delivered) return;
+      if (this.delivered || (message.graphics !== undefined && !isPacmanGraphics(message.graphics))) return;
+      if (isPacmanGraphics(message.graphics)) this.graphics = message.graphics;
       this.phase = message.phase;
       this.callbacks.hud(message.hud);
       if (["playing", "paused", "countdown", "intro"].includes(this.phase)) this.callbacks.overlay(this.phase === "intro" ? "playing" : this.phase, "PAC-MAN", "", typeof message.countdown === "number" ? message.countdown : undefined);
@@ -158,7 +167,7 @@ export class PacmanAdapter {
       this.ranked = null;
       this.delivered = true;
       this.phase = "intro";
-      this.callbacks.overlay("intro", "PAC-MAN", "Choose a two-minute global challenge or classic local play.");
+      this.callbacks.overlay("intro", "PAC-MAN", this.introCopy());
     } else if (message.type === "fullscreen") this.callbacks.fullscreen?.();
   };
 }

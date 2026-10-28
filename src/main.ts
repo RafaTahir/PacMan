@@ -8,7 +8,7 @@ import { setupViewControls } from "./view";
 import { guardedActivation } from "./activation";
 import { ResumeCountdown, powerCue, queuedTurn } from "./experience";
 import type { Direction, FruitKind, GameEvent, GameState } from "./types";
-import { PACMAN_BRIDGE, PACMAN_MAX_TICKS, PacmanRankedSession, isBridgeEnvelope, type ChildMessage, type PacmanSettings } from "./pacman-host";
+import { PACMAN_BRIDGE, PACMAN_MAX_TICKS, PacmanRankedSession, isBridgeEnvelope, type ChildMessage, type PacmanGraphics, type PacmanSettings } from "./pacman-host";
 
 const embedded = window.parent !== window && new URLSearchParams(location.search).get("arcade") === "1";
 if (embedded) document.body.classList.add("arcade-embedded");
@@ -18,6 +18,7 @@ let rankedSession: PacmanRankedSession | null = null;
 let startingFromHost = false;
 let bridgeFinished = false;
 let bridgeSignature = "";
+let bridgeGraphics: PacmanGraphics | null = null;
 let disposed = false;
 let frameRequest = 0;
 const bridgeListeners = new AbortController();
@@ -848,14 +849,22 @@ updateSettings();
 updateInterface();
 frameRequest = requestAnimationFrame(frame);
 
+function publishReady() {
+  bridgeGraphics = renderer.graphicsInfo.backend === "webgl" ? "webgl" : "canvas-fallback";
+  postToHost({ type: "ready", graphics: bridgeGraphics });
+}
+
 function publishBridge(force = false) {
-  if (!embedded || bridgeSession === 0 || disposed) return;
+  if (!embedded || disposed) return;
+  const graphics = renderer.graphicsInfo.backend === "webgl" ? "webgl" : "canvas-fallback";
+  if (graphics !== bridgeGraphics) publishReady();
+  if (bridgeSession === 0) return;
   const state = game().state;
   const phase = atTitle ? "intro" : isOver() ? "ended" : resumeCountdown.active ? "countdown" : state.paused || modalOpen() ? "paused" : "playing";
-  const signature = [phase, Math.floor(state.frame / 15), state.score, state.lives, state.level, state.remaining, resumeCountdown.seconds].join(":");
+  const signature = [phase, Math.floor(state.frame / 15), state.score, state.lives, state.level, state.remaining, resumeCountdown.seconds, graphics].join(":");
   if (force || signature !== bridgeSignature) {
     bridgeSignature = signature;
-    postToHost({ type: "status", session: bridgeSession, phase, countdown: resumeCountdown.active ? resumeCountdown.seconds : undefined,
+    postToHost({ type: "status", session: bridgeSession, phase, graphics, countdown: resumeCountdown.active ? resumeCountdown.seconds : undefined,
       hud: { score: state.score, level: state.level, lives: state.lives, remaining: state.remaining, frames: state.frame, paused: phase !== "playing", phase: state.phase } });
   }
   if (!bridgeFinished && isOver()) {
@@ -889,7 +898,7 @@ function disposeBridge() {
 function receiveHost(event: MessageEvent) {
   if (!embedded || disposed || event.origin !== location.origin || event.source !== window.parent || !isBridgeEnvelope(event.data)) return;
   const message = event.data;
-  if (message.type === "hello") postToHost({ type: "ready" });
+  if (message.type === "hello") publishReady();
   else if (message.type === "dispose") disposeBridge();
   else if (message.type === "pause") pauseForBackground();
   else if (message.type === "toggle-pause") togglePause();
@@ -933,5 +942,5 @@ if (embedded) {
     event.preventDefault(); event.stopImmediatePropagation();
     postToHost({ type: "fullscreen", session: bridgeSession });
   }, { capture: true, signal: bridgeListeners.signal });
-  postToHost({ type: "ready" });
+  publishReady();
 }
