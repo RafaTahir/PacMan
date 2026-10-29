@@ -25,4 +25,6 @@ for poly in obj.data.polygons:
 out={'positions':positions,'normals':normals,'source':'Original hibiscus mesh generated in Blender; scripts/create-pinball-blender-asset.py'}
 path=os.path.join(os.getcwd(),'src/arcade/games/midnight-pinball/assets/hibiscus.json')
 with open(path,'w') as f:json.dump(out,f,separators=(',',':'))
-print('BLENDER_ASSET',bpy.app.version_string,len(positions)//3,path)
+blend_path=os.path.join(os.getcwd(),'src/arcade/games/midnight-pinball/assets/hibiscus.blend')
+bpy.ops.wm.save_as_mainfile(filepath=blend_path)
+print('BLENDER_ASSET',bpy.app.version_string,len(positions)//3,path,blend_path)

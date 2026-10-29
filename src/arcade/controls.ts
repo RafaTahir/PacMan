@@ -10,6 +10,8 @@ export class ArcadeControls {
   private aimY = -127;
   private pointerPaddle = false;
   private heldButtons = 0;
+  private nudgeLeft = false;
+  private nudgeRight = false;
   private aimFiring = false;
   private mouseFiring = false;
   private readonly resetters: (() => void)[] = [];
@@ -75,6 +77,13 @@ export class ArcadeControls {
       };
       for (const name of ["pointerup", "pointercancel", "lostpointercapture"] as const) stick.addEventListener(name, release, { signal });
     }
+    for (const [id, side] of [["touch-nudge-left", "left"], ["touch-nudge-right", "right"]] as const) {
+      const button = document.getElementById(id)!;
+      const set = (held: boolean) => { if (side === "left") this.nudgeLeft = held; else this.nudgeRight = held; button.classList.toggle("held", held); };
+      button.addEventListener("pointerdown", event => { if (!this.enabled() || this.definition.controls !== "flippers") return; event.preventDefault(); set(true); button.setPointerCapture(event.pointerId); }, { signal });
+      for (const name of ["pointerup", "pointercancel", "lostpointercapture"] as const) button.addEventListener(name, () => set(false), { signal });
+      button.addEventListener("click", event => { if (event.detail === 0 && this.enabled() && this.definition.controls === "flippers") { set(true); setTimeout(() => set(false), 80); } }, { signal });
+    }
     for (const [id, bit] of [["touch-primary", Buttons.PRIMARY], ["touch-secondary", Buttons.SECONDARY], ["touch-launch", Buttons.LAUNCH]] as const) {
       const button = document.getElementById(id)!;
       button.addEventListener("pointerdown", event => {
@@ -95,7 +104,7 @@ export class ArcadeControls {
     const y = this.touchY || (Number(down("s", "arrowdown")) - Number(down("w", "arrowup"))) * 127;
     let buttons = this.heldButtons;
     if (this.definition.controls === "flippers") {
-      x = (Number(down("d")) - Number(down("a"))) * 127;
+      x = (Number(down("d") || this.nudgeRight) - Number(down("a") || this.nudgeLeft)) * 127;
       if (down("arrowleft", "z")) buttons |= Buttons.PRIMARY;
       if (down("arrowright", "/")) buttons |= Buttons.SECONDARY;
       if (down(" ", "enter")) buttons |= Buttons.LAUNCH;
@@ -110,6 +119,7 @@ export class ArcadeControls {
   clear(): void {
     this.keys.clear(); this.touchX = this.touchY = this.heldButtons = 0;
     this.mouseFiring = this.aimFiring = this.pointerPaddle = false;
+    this.nudgeLeft = this.nudgeRight = false;
     this.resetters.forEach(reset => reset());
     document.querySelectorAll<HTMLElement>(".stick-knob").forEach(knob => { knob.style.transform = ""; });
     document.querySelectorAll("#touch-controls .held").forEach(button => button.classList.remove("held"));

@@ -9,7 +9,7 @@ export const gameDefinition: GameDefinition = {
   description: "A Malaysian island after dark. Fire the hibiscus bumpers, tour the island ramp and river orbit, then light three stars for pasar malam multiball.",
   accent: "#68ddae", controls: "flippers",
   desktopInstructions: "Z / left arrow: left flipper · / / right arrow: right flipper · hold Space, release to launch · WASD: nudge (watch tilt). Light 3 gold stars, then shoot the left ramp for multiball. Complete left ramp + right river for Island Tour bonus and multiplier. 3 balls · 2 minutes.",
-  touchInstructions: "Hold LEFT / RIGHT to flip · hold LAUNCH, release to plunge. Light all 3 gold stars, then shoot the left ramp for multiball. Complete left ramp + right river for Island Tour bonus. Both routes pay multiball jackpots. 3 balls · 2 minutes.",
+  touchInstructions: "Hold LEFT / RIGHT to flip · hold LAUNCH, release to plunge. Tap NUDGE to shift the ball (too much tilts). Light all 3 gold stars, then shoot the left ramp for multiball. Complete left ramp + right river for Island Tour bonus. Both routes pay multiball jackpots. 3 balls · 2 minutes.",
   primaryLabel: "LEFT FLIPPER", secondaryLabel: "RIGHT FLIPPER",
   createSimulation,
   createView: (stage, simulation) => createView(stage, simulation.state as PinballState),

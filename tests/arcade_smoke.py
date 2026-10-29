@@ -382,6 +382,9 @@ def demonstrate_touch(page, game):
         touch_control(page, "#touch-launch", duration=500)
         page.wait_for_timeout(180)
         require(any(ball["mode"] != "plunger" for ball in app(page)["state"]["balls"]), "Releasing the actual touch launch plunges the ball")
+        before_tilt = app(page)["state"]["tilt"]
+        nudged = touch_control(page, "#touch-nudge-left", duration=350, during=lambda: app(page)["state"])
+        require(nudged["tilt"] > before_tilt + .2, "Touch nudge moves the real table and increases tilt")
         left = touch_control(page, "#touch-primary", duration=150, during=lambda: app(page)["state"])
         require(left["flippers"][0]["angle"] < -.3, "Holding the touch left flipper rotates the simulated bat")
         right = touch_control(page, "#touch-secondary", duration=150, during=lambda: app(page)["state"])

@@ -75,3 +75,9 @@ body.reduced-motion *,body.reduced-motion *:before,body.reduced-motion *:after{a
 #play-objective{max-width:760px;color:#deebbb}#score-save-status{margin-left:auto;color:#b6c7cf;font-size:10px;text-align:right}
 @media(max-width:640px){.graphics-capability{padding:12px;font-size:12px}.showroom-static{inset:8px 20px;padding:9px 14px}.play-context{padding:6px 12px;display:block;font-size:10px}#score-save-status{font-size:9px;text-align:left}#play-objective:not([hidden])+#score-save-status{margin-top:3px}.cabinet-capability{font-size:9px}}
 @media(orientation:landscape) and (max-height:550px){.play-context{padding:4px 12px;font-size:9px;line-height:1.3}#score-save-status{font-size:8px}}
+.touch-nudge{display:none;gap:8px;justify-content:center}
+body.play-controls-flippers .touch-nudge{display:flex;order:3;flex-basis:100%}
+.touch-nudge button{min-width:100px;min-height:44px;padding:6px 12px;border:1px solid #637269;border-radius:8px;background:#1c2926;color:#e5f2df;font-size:10px;font-weight:700;touch-action:manipulation}
+.touch-nudge button.held{background:#536645;transform:translateY(2px)}
+@media(orientation:landscape) and (max-height:550px) and (pointer:coarse){body.play-controls-flippers .touch-nudge{width:100%;gap:6px}body.play-controls-flippers .touch-nudge button{flex:1;min-width:0;min-height:44px;padding:4px;font-size:8px}}
+@media(orientation:landscape) and (max-height:550px) and (pointer:coarse){body.play-controls-flippers .touch-controls{justify-content:center;padding:2px 8px}body.play-controls-flippers .touch-action-zone{gap:2px}body.play-controls-flippers .touch-action{height:44px;min-height:44px}body.play-controls-flippers .touch-nudge{flex-basis:auto}}
