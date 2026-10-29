@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import hibiscus from "./assets/hibiscus.json";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { ArcadeView, ThreeStage, VisualOptions } from "../../shared/contracts";
 import { BALL_RADIUS, BUMPERS, RAILS, RAMP_LENGTH, RIVER_LENGTH, TARGETS, rampPoint, riverPoint, type PinballState } from "./model";
@@ -102,18 +103,17 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
     disk(r.ax, r.ay, 0.13, 0.09, 0.24, rail); disk(r.bx, r.by, 0.13, 0.09, 0.24, rail);
   }
   const bumperCaps: THREE.Mesh[] = [], bumperRings: THREE.Mesh[] = [];
-  const petalGeometry = new THREE.SphereGeometry(0.19, 9, 6);
+  const hibiscusGeometry = new THREE.BufferGeometry();
+  hibiscusGeometry.setAttribute("position", new THREE.Float32BufferAttribute(hibiscus.positions, 3));
+  hibiscusGeometry.setAttribute("normal", new THREE.Float32BufferAttribute(hibiscus.normals, 3));
   BUMPERS.forEach((b, i) => {
     disk(b.x, b.y, 0.08, b.radius + 0.16, 0.12, dark); ring(b.x, b.y, 0.15, b.radius + 0.11, violet);
     disk(b.x, b.y, 0.23, b.radius, 0.28, chrome);
     const cap = disk(b.x, b.y, 0.41, b.radius * 0.86, 0.12, material(i === 2 ? C.pink : C.cyan, i === 2 ? C.pink : C.cyan, 0.35)); bumperCaps.push(cap);
     bumperRings.push(ring(b.x, b.y, 0.49, b.radius * 0.66, i === 2 ? pink : cyan, 0.035));
-    // Five sculpted hibiscus petals sit within the matching physical bumper cap.
-    for (let petal = 0; petal < 5; petal++) {
-      const angle = petal * Math.PI * 2 / 5, flower = mesh(petalGeometry, i === 2 ? gold : coral);
-      flower.position.copy(vector(b.x + Math.cos(angle) * 0.25, b.y + Math.sin(angle) * 0.25, 0.52));
-      flower.scale.set(1.2, 0.72, 0.22); flower.rotation.z = -angle;
-    }
+    // Original Blender-authored five-petal mesh; shared and batched with the table.
+    const flower = mesh(hibiscusGeometry, i === 2 ? gold : coral);
+    flower.position.copy(vector(b.x, b.y, 0.52)); flower.scale.setScalar(0.8);
     disk(b.x, b.y, 0.56, b.radius * 0.17, 0.07, gold);
     label(["100", "100", "100"][i], b.x, b.y + 0.03, 0.54, 0.6, 0.27, "#edffff", 48);
   });
