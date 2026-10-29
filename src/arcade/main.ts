@@ -106,8 +106,9 @@ function updateHud(definition: GameDefinition, simulation: ArcadeSimulation) {
   if (definition.id === "midnight-pinball") {
     const tour = all.find(item => item.label === "ISLAND TOUR");
     const table = all.find(item => item.label === "TILT" || item.label === "TABLE");
+    const feedback = all.find(item => item.label === "NIGHT SHIFT");
     $("play-objective").textContent = table?.label === "TILT" ? "TILT · flippers disabled until the next ball."
-      : `3 stars → left ramp: multiball. Left ramp + right river: Island Tour. ${tour?.value ?? ""}`;
+      : `3 stars → left ramp: multiball. Ramp + river: Island Tour. ${tour?.value ?? ""} · ${feedback?.value ?? ""}`;
   }
   const seconds = Math.max(0, Math.ceil((MAX_TICKS - simulation.state.tick) / TICK_RATE));
   const signature = `${score}:${seconds}:${extra.map(item => `${item.label}:${item.value}`).join("|")}`;
