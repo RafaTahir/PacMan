@@ -150,7 +150,9 @@ export class ArcadeController {
       while (this.accumulator + 1e-10 >= DT && this.phase === "playing") {
         const input = this.input.read();
         this.recorder.record(this.simulation.state.tick, input);
-        this.audio.handle(this.selection, this.simulation.step(input)); this.accumulator -= DT;
+        const signals = this.simulation.step(input);
+        this.audio.handle(this.selection, signals); this.accumulator -= DT;
+        if (signals.length) window.dispatchEvent(new CustomEvent("arcade-signals", { detail: { game: this.selection, signals } }));
         if (this.simulation.state.status !== "playing" || this.simulation.state.tick >= MAX_TICKS) this.finish();
       }
     }

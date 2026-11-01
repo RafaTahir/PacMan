@@ -140,3 +140,40 @@ if (scoreDialog) {
     if (scoreDialog.dataset.newBest === "true") setTimeout(() => confetti(scoreDialog), 60);
   }).observe(scoreDialog, { attributes: true, attributeFilter: ["open"] });
 }
+
+// In-run feedback: screen shake, damage flash and chain/upgrade callouts. Presentation only;
+// the simulations and replay verification never see any of this.
+const playStage = byId("play-stage");
+const callouts = document.createElement("div");
+callouts.className = "run-callouts";
+callouts.setAttribute("aria-hidden", "true");
+playStage?.parentElement?.append(callouts);
+// Only games where a hit signal means the player took damage.
+const PLAYER_HIT_GAMES = new Set(["neon-rally", "chrome-siege", "tidal-courier", "canopy-sprint"]);
+function pulse(className: string, ms: number): void {
+  if (!playStage) return;
+  playStage.classList.remove(className);
+  void playStage.offsetWidth;
+  playStage.classList.add(className);
+  setTimeout(() => playStage.classList.remove(className), ms);
+}
+function callout(text: string, tone: "chain" | "upgrade" | "boss"): void {
+  const item = document.createElement("span");
+  item.className = `run-callout run-callout-${tone}`;
+  item.textContent = text;
+  callouts.append(item);
+  while (callouts.childElementCount > 3) callouts.firstElementChild?.remove();
+  setTimeout(() => item.remove(), 1400);
+}
+window.addEventListener("arcade-signals", (event) => {
+  if (!motionOk()) return;
+  const { game, signals } = (event as CustomEvent<{ game: string; signals: { type: string; value?: number }[] }>).detail;
+  for (const signal of signals) {
+    if (signal.type === "hit" && PLAYER_HIT_GAMES.has(game) && (signal.value ?? 1) >= 1) pulse("fx-hit", 260);
+    else if (signal.type === "death") pulse("fx-death", 520);
+    else if (signal.type === "chain") callout(signal.value && signal.value > 1 ? `CHAIN x${signal.value}` : "CHAIN", "chain");
+    else if (signal.type === "upgrade") callout("UPGRADE", "upgrade");
+    else if (signal.type === "boss") callout("PHASE SHIFT", "boss");
+    else if (signal.type === "multiball") callout("MULTIBALL", "chain");
+  }
+});

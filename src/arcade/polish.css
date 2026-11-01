@@ -280,3 +280,17 @@ body.high-contrast .proof-strip span, body.high-contrast .how-steps p { color: #
 /* Hollow Bureau: the eleventh cabinet is a full-width row so the grid never ends ragged. */
 .cabinet-card-wide { grid-column: 1 / -1; }
 .cabinet-card-wide .cabinet-art { max-height: 120px; }
+
+/* In-run feedback: damage flash, death shake and chain callouts. */
+.play-body { position: relative; }
+.play-stage.fx-hit::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3; box-shadow: inset 0 0 90px 18px #ff2f4fb0; animation: fx-flash 0.26s ease-out forwards; }
+.play-stage.fx-death { animation: fx-shake 0.52s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fx-shake { 10%, 90% { transform: translate(-2px, 1px); } 20%, 80% { transform: translate(4px, -2px); } 30%, 50%, 70% { transform: translate(-7px, 3px); } 40%, 60% { transform: translate(7px, -3px); } }
+.run-callouts { position: absolute; left: 0; right: 0; top: 18%; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; z-index: 4; }
+.run-callout { padding: 6px 18px; border: 1px solid currentColor; border-radius: 2px; background: #05070bcc; font: 700 15px/1 var(--mono, ui-monospace, monospace); letter-spacing: 0.22em; animation: callout-rise 1.4s ease-out forwards; }
+.run-callout-chain { color: #ffe36c; }
+.run-callout-upgrade { color: #76e8e0; }
+.run-callout-boss { color: #ff5c83; }
+@keyframes callout-rise { 0% { opacity: 0; transform: translateY(14px) scale(0.9); } 15% { opacity: 1; transform: translateY(0) scale(1.06); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-22px); } }
+@media (prefers-reduced-motion: reduce) { .play-stage.fx-hit::after, .play-stage.fx-death, .run-callout { animation: none; } }
