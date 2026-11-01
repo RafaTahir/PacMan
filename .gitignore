@@ -15,3 +15,5 @@ __pycache__/
 *.pyc
 
 dist-sites/
+
+*.blend1
