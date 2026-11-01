@@ -270,5 +270,9 @@ body.high-contrast #quick-play { box-shadow: none; }
   .library-section, .how-section { padding-top: 40px; }
   .site-footer { font-size: 11px; }
 }
+.lineup-banner { position: relative; margin: 28px 0 0; overflow: hidden; border: 1px solid var(--line); background: #060912; }
+.lineup-banner img { display: block; width: 100%; height: auto; aspect-ratio: 2400 / 760; }
+.lineup-banner::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to bottom, transparent 55%, #0b0c0e 100%), radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.45)); }
+@media (max-width: 640px) { .lineup-banner { margin-top: 20px; } .lineup-banner img { height: 200px; object-fit: cover; aspect-ratio: auto; } }
 body.high-contrast .proof-strip, body.high-contrast .how-steps li { background: #080b09; border-color: #a4b698; }
 body.high-contrast .proof-strip span, body.high-contrast .how-steps p { color: #e2ecd7; }
