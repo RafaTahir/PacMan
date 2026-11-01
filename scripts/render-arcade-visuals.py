@@ -20,6 +20,7 @@ CABINETS = [
     ('PAC-MAN', '#ffe36c'), ('NEON RALLY', '#ff779c'), ('REACTOR BREAKER', '#76e8e0'), ('CHROME SIEGE', '#bc9aff'),
     ('MIDNIGHT PINBALL', '#ffb56d'), ('ORBIT SALVAGE', '#8dcfff'), ('TIDAL COURIER', '#61e6c0'),
     ('PRISM CIRCUIT', '#ff9cda'), ('SKYBOUND STACK', '#ffcb77'), ('CANOPY SPRINT', '#b2e875'),
+    ('HOLLOW BUREAU', '#ff3b2f'),
 ]
 FONT_BLACK = 'C:/Windows/Fonts/ariblk.ttf'
 FONT_BOLD = 'C:/Windows/Fonts/arialbd.ttf'
@@ -187,7 +188,7 @@ for obj in [
     text('AFTER HOURS  /  THE ARCADE COLLECTION', 0.27, (-5.45, 6.0, 3.95), white, FONT_MONO, align='LEFT'),
     text('One more', 1.0, (-5.5, 6.0, 2.55), yellow, FONT_BLACK, align='LEFT', extrude=0.03),
     text('round.', 1.0, (-5.5, 6.0, 1.45), white, FONT_BLACK, align='LEFT', extrude=0.03),
-    text('10 FREE 3D GAMES  /  REAL GLOBAL LEADERBOARDS', 0.27, (-5.45, 6.0, 0.3), white, FONT_MONO, align='LEFT'),
+    text('11 FREE 3D GAMES  /  REAL GLOBAL LEADERBOARDS', 0.27, (-5.45, 6.0, 0.3), white, FONT_MONO, align='LEFT'),
 ]:
     for coll in list(obj.users_collection):
         coll.objects.unlink(obj)
@@ -201,19 +202,21 @@ def set_hidden(root, hidden):
 
 
 def layout_og():
-    """Four cabinets (the same four colours as the original card) on the right, copy on the left."""
+    """Four cabinets on the right (PAC-MAN, Neon Rally, Chrome Siege and the newest, Hollow Bureau), copy on the left."""
+    featured = {0: 0, 1: 1, 3: 2, 10: 3}
     for i, root in enumerate(cabinet_roots):
-        set_hidden(root, i > 3)
-        if i > 3:
+        slot = featured.get(i)
+        set_hidden(root, slot is None)
+        if slot is None:
             continue
-        root.location = (0.9 + i * 1.7, 6.0 - abs(i - 1.5) * 0.12, 0)
-        root.rotation_euler = (0, 0, (i - 1.5) * -0.07)
+        root.location = (0.4 + slot * 1.6, 6.0 - abs(slot - 1.5) * 0.12, 0)
+        root.rotation_euler = (0, 0, (slot - 1.5) * -0.07)
         root.scale = (1.2, 1.2, 1.2)
 
 
 def layout_banner():
-    """All ten cabinets on a gentle arc facing the camera at the arc's centre."""
-    radius, span = 12.0, 70
+    """All eleven cabinets on a gentle arc facing the camera at the arc's centre."""
+    radius, span = 12.0, 66
     for i, root in enumerate(cabinet_roots):
         set_hidden(root, False)
         theta = math.radians(-span / 2 + span * i / (len(cabinet_roots) - 1))
@@ -233,7 +236,7 @@ def make_camera(name, location, lens, focus, fstop):
 
 
 cam_og = make_camera('og camera', (0.0, -4.0, 1.5), 24, 10.0, 8.0)
-cam_banner = make_camera('banner camera', (0.0, 0.0, 1.25), 28, 12.0, 8.0)
+cam_banner = make_camera('banner camera', (0.0, 0.0, 1.25), 22, 12.0, 8.0)
 
 # Cycles on CPU with denoising keeps the render practical on a laptop.
 scene.render.engine = 'CYCLES'
