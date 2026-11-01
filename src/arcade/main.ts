@@ -1,4 +1,5 @@
 import "./style.css";
+import "./polish";
 import { guardedActivation } from "../activation";
 import { cabinets } from "./catalog";
 import { ArcadeController, type FinishedRun } from "./controller";
@@ -261,7 +262,9 @@ function showResult(finished: FinishedRun) {
   if (finished.game !== selected) return;
   result = finished; resultAccepted = false; submitting = false;
   $("score-save-status").textContent = finished.run ? "Global score not saved · enter initials and choose Save global score." : "Practice complete · local best only · no global score submitted.";
+  const previousBest = localBest(finished.game);
   saveBest(finished.game, finished.score); updateBests();
+  dialogs.scores.dataset.newBest = String(finished.score > 0 && finished.score > previousBest);
   $("result-title").textContent = finished.victory ? "Night well spent." : "One more round?";
   $("result-score").textContent = finished.score.toLocaleString();
   $("result-copy").textContent = finished.run ? "Three letters. A place on the real global board. Your replay will be checked before the score is saved." : "Saved as a local best on this device. Local practice does not enter the global rankings.";
@@ -313,8 +316,15 @@ function showFeatured(index: number) {
   $("featured-caption").textContent = `FEATURED · ${cabinet.title}`;
   $("featured-position").textContent = `${String(featuredIndex + 1).padStart(2, "0")} / ${String(cabinets.length).padStart(2, "0")}`;
   featuredPanel.style.setProperty("--featured-accent", cabinet.accent);
+  document.dispatchEvent(new CustomEvent("featured-change", { detail: { index: featuredIndex, accent: cabinet.accent } }));
   showroom?.setFeatured(featuredIndex);
 }
+document.addEventListener("featured-select", event => showFeatured((event as CustomEvent<number>).detail));
+$("surprise-play").addEventListener("click", () => {
+  const pool = cabinets.filter(cabinet => webgl2Available || cabinet.id === "pacman");
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  requestSwitch(() => void launch(pick.id));
+});
 $("featured-previous").addEventListener("click", () => showFeatured(featuredIndex - 1));
 $("featured-next").addEventListener("click", () => showFeatured(featuredIndex + 1));
 $("quick-play").addEventListener("click", () => requestSwitch(() => void launch(cabinets[featuredIndex].id)));

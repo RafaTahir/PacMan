@@ -1,0 +1,10 @@
+{
+  "name": "After Hours Arcade",
+  "short_name": "After Hours",
+  "description": "Ten free 3D browser games with real global leaderboards.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0c0e",
+  "theme_color": "#0b0c0e",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
