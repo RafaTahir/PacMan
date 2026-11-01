@@ -1,4 +1,4 @@
-import { Buttons, DT, MAX_TICKS, type ArcadeInput, type ArcadeSimulation, type ArcadeState, type GameSignal } from "../../shared/contracts";
+import { Buttons, DT, MAX_TICKS, type ArcadeSimulation, type ArcadeState, type GameSignal } from "../../shared/contracts";
 import { axis, clamp, seededRandom } from "../../shared/math";
 
 export const BOARD = { halfWidth: 8, top: -9.5, bottom: 10.2, paddleY: 8.35, paddleHalfWidth: 1.45, ballRadius: 0.2 } as const;

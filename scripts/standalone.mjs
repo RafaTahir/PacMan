@@ -10,7 +10,6 @@ const script = html.match(/<script\b[^>]*src="([^"]+)"[^>]*><\/script>/);
 const style = html.match(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/);
 if (!script || !style)
   throw new Error("Expected one Vite JavaScript entry and stylesheet.");
-const asset = (path) => resolve(output, path.replace(/^\//, ""));
 // The arcade has multiple Vite entries and shared chunks. Bundle this preserved
 // classic separately so the offline HTML does not retain relative chunk imports.
 const standalone = await build({

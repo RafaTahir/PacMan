@@ -291,7 +291,7 @@ export class RallyView implements ArcadeView {
     this.updateHazards(fraction, options);
     this.updateEffects(options);
     this.playerRing.position.x = playerX;
-    this.playerRing.material instanceof THREE.MeshBasicMaterial && this.playerRing.material.color.setHex(state.player.boosting ? PINK : state.player.oilTicks > 0 ? 0xffbe67 : CYAN);
+    if (this.playerRing.material instanceof THREE.MeshBasicMaterial) this.playerRing.material.color.setHex(state.player.boosting ? PINK : state.player.oilTicks > 0 ? 0xffbe67 : CYAN);
     this.headlightWash.position.x = playerX;
     this.headlightWash.rotation.z = -state.player.heading;
     this.playerLight.position.x = playerX;

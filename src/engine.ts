@@ -14,7 +14,6 @@ import {
   fruitForLevel,
   getLevelConfig,
   scatterSchedule,
-  TICK_RATE,
   TICK_SECONDS,
 } from "./levels";
 

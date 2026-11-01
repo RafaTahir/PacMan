@@ -11,6 +11,11 @@ The home page displays **real global, persistent, per-game leaderboards**. All t
 | Reactor Breaker | Aimed paddle, stacked towers, armor, charged pulses, explosive chains, upgrades and three sectors | [Rules](docs/games/REACTOR_BREAKER.md) |
 | Chrome Siege | Twin-stick waves, distinct enemies, dash protection, pickups, upgrades and a three-phase boss | [Rules](docs/games/CHROME_SIEGE.md) |
 | Midnight Pinball | Powered flippers, plunger, bumpers, three balls, elevated ramp, earned multiball and jackpots | [Physics/rules](docs/games/MIDNIGHT_PINBALL.md) |
+| Orbit Salvage | Inertia, asteroid splitting, cannon heat, shields, ore and refinery contracts | [Overview](docs/ARCADE_EXPANSION.md) |
+| Tidal Courier | Boat momentum, changing currents, reefs and ferries, cargo delivery, brakes, boost and repair streaks | [Overview](docs/ARCADE_EXPANSION.md) |
+| Prism Circuit | Seeded solvable 3×3 to 5×5 routing puzzles, tile rotation, undo and live path feedback | [Overview](docs/ARCADE_EXPANSION.md) |
+| Skybound Stack | Original falling-block game with mixed shapes, wall kicks, ghost landing, row clears, chains and lock delay | [Overview](docs/ARCADE_EXPANSION.md) |
+| Canopy Sprint | Three-lane rainforest runner with jump/slide/dodge obstacles, orchid chains, near misses and rising pace | [Overview](docs/ARCADE_EXPANSION.md) |
 
 ## Run locally
 
@@ -64,6 +69,7 @@ Local practice/device bests are separate. Accepted all-time scores have no autom
 ## Verify
 
 ```sh
+npm run lint
 npm test
 npm run build
 ARCADE_PRODUCTION_URL=http://127.0.0.1:8787 \
@@ -107,3 +113,7 @@ Run `npm run build:sites`, then `npm run test:sites`. The package entry is `dist
 The package also copies the immutable `drizzle/` SQL/snapshots/journal and `.openai/hosting.json` byte-for-byte. The Worker hosting manifest keeps the existing project ID, `d1:"DB"`, and `r2:null`, without obsolete `static_dir`. Apply pending schema migrations before uploading this packaged Worker through the official Sites WorkerESM workflow. The packaging step does not publish or migrate a remote database.
 
 The ten-cabinet release and its database-preservation/validation notes are documented in [Arcade expansion](docs/ARCADE_EXPANSION.md).
+
+## Scheduled cleanup and hardening
+
+A Worker cron (`triggers.crons` in `wrangler.jsonc`, hourly) calls `scheduled()` in `server/index.ts`, which drains expired rate-limit counters and abandoned run tickets in bounded batches. Accepted scores are never touched. Identical leaderboard reads are cached in the isolate for 10 seconds and invalidated when a score is accepted. Replay verification has its own stricter per-network limit. All responses carry a restrictive Content-Security-Policy, `Referrer-Policy: no-referrer` and `nosniff`; `public/_headers` mirrors them for static hosts that honour it.

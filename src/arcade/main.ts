@@ -5,7 +5,7 @@ import { ArcadeController, type FinishedRun } from "./controller";
 import { ArcadeSound } from "./audio";
 import { Leaderboard } from "./leaderboard";
 import { supportsWebGL2 } from "./capabilities";
-import { Showroom } from "./showroom";
+import type { Showroom } from "./showroom";
 import { PacmanAdapter } from "./pacman-adapter";
 import { ApiError, submitRun } from "./api";
 import { localBest, preference, saveBest, store } from "./preferences";
@@ -31,6 +31,16 @@ let selected: GameId | null = null;
 let controller: ArcadeController | null = null;
 let pacman: PacmanAdapter | null = null;
 let showroom: Showroom | null = null;
+let showroomToken = 0;
+function mountShowroom(): void {
+  const token = ++showroomToken;
+  void import("./showroom").then(({ Showroom }) => {
+    if (token !== showroomToken || $("arcade-home").hidden) return;
+    showroom?.dispose();
+    showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex, webgl2Available);
+  });
+}
+function disposeShowroom(): void { showroomToken++; showroom?.dispose(); showroom = null; }
 let revision = 0;
 let result: FinishedRun | null = null;
 let resultAccepted = false;
@@ -127,7 +137,7 @@ function releaseGame() {
   for (const dialog of Object.values(dialogs)) if (dialog.open) dialog.close();
 }
 async function launch(id: GameId) {
-  releaseGame(); showroom?.dispose(); showroom = null;
+  releaseGame(); disposeShowroom();
   selected = id; const version = revision;
   $("play-objective").hidden = id !== "midnight-pinball";
   $("play-objective").textContent = id === "midnight-pinball" ? "3 stars → left ramp: multiball. Left ramp + right river: Island Tour." : "";
@@ -187,7 +197,7 @@ function homeNow() {
   document.body.classList.remove("playing-pacman");
   document.title = "After Hours Arcade · One more round.";
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-  showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex, webgl2Available); updateBests();
+  mountShowroom(); updateBests();
   void board.refresh(true); $("home-brand").focus({ preventScroll: true });
 }
 function requestSwitch(action: () => void) {
@@ -221,7 +231,7 @@ function settingsChanged() {
   $("play-mute-button").setAttribute("aria-label", preference.muted ? "Enable sound" : "Mute sound");
   $("play-mute-button").setAttribute("aria-pressed", String(preference.muted));
   const label = $("play-mute-button").querySelector(".button-label"); if (label) label.textContent = preference.muted ? "Muted" : "Sound";
-  if (!$("arcade-home").hidden) { showroom?.dispose(); showroom = new Showroom($("showroom"), preference.reducedMotion, featuredIndex, webgl2Available); }
+  if (!$("arcade-home").hidden) mountShowroom();
 }
 function showHelp() {
   if (pacman) {
@@ -382,7 +392,7 @@ const fit = () => { cancelAnimationFrame(resizeRaf); resizeRaf = requestAnimatio
 }); };
 window.addEventListener("resize", fit); window.addEventListener("orientationchange", fit); window.visualViewport?.addEventListener("resize", fit);
 if (typeof ResizeObserver !== "undefined") new ResizeObserver(fit).observe($("play-stage"));
-window.addEventListener("pagehide", () => { releaseGame(); showroom?.dispose(); board.dispose(); audio.dispose(); });
+window.addEventListener("pagehide", () => { releaseGame(); disposeShowroom(); board.dispose(); audio.dispose(); });
 $<HTMLInputElement>("setting-mute").checked = preference.muted;
 $<HTMLInputElement>("setting-motion").checked = preference.reducedMotion;
 $<HTMLInputElement>("setting-contrast").checked = preference.highContrast;

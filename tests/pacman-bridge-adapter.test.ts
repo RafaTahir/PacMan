@@ -39,7 +39,7 @@ describe("Pac-Man iframe host boundary", () => {
     vi.stubGlobal("document", fakeDocument);
     callbacks = { overlay: vi.fn(), hud: vi.fn(), result: vi.fn(), notice: vi.fn(), isModalOpen: () => false, fullscreen: vi.fn() };
     mount = { append: vi.fn() };
-    adapter = new PacmanAdapter(mount as unknown as HTMLElement, callbacks);
+    adapter = new PacmanAdapter(mount as unknown as HTMLElement, callbacks as unknown as ConstructorParameters<typeof PacmanAdapter>[1]);
   });
 
   afterEach(() => {

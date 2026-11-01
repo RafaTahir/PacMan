@@ -21,7 +21,7 @@ export function createView(stage:ThreeStage,simulation:ArcadeSimulation):ArcadeV
  }
  const reefs=REEFS.map(r=>{const o=mesh(geo(new THREE.IcosahedronGeometry(r.radius,0)),coral);o.position.set(r.x,.09,r.y);o.scale.y=.6;return o;});
  const dockRings:THREE.Mesh[]=[],cargoCrates:THREE.Mesh[]=[],dockMats:THREE.MeshStandardMaterial[]=[];
- for(const [i,d]of DOCKS.entries()){
+ for(const d of DOCKS){
   const m=mat(0x556d76,0x102b35,.4);dockMats.push(m);const ring=mesh(geo(new THREE.TorusGeometry(1.05,.055,8,36)),m);ring.rotation.x=Math.PI/2;ring.position.set(d.x,.04,d.y);dockRings.push(ring);
   box(d.x,.14,d.y+.8,1.6,.15,.38,wood);for(const x of [-.65,.65])box(d.x+x,.22,d.y+.8,.1,.6,.1,white);
   const crate=box(d.x,.4,d.y+.8,.35,.35,.3,gold);cargoCrates.push(crate);

@@ -18,7 +18,7 @@ const run = (simulation: ReturnType<typeof createSimulation>, count: number, con
  * collect nearby cores, and dash when a hostile closes. It uses only public input, no state edits. */
 function pilot(s: SiegeState): ArcadeInput {
   const p = s.player;
-  let target = s.enemies.filter(e => e.spawnTicks === 0).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+  const target = s.enemies.filter(e => e.spawnTicks === 0).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
   const angle = s.tick * .0036;
   let destination = { x: Math.cos(angle) * 7.1, y: Math.sin(angle) * 5.1 };
   const core = s.pickups.filter(item => item.kind === "repair" && p.hp < p.maxHp || item.kind === "core")

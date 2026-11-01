@@ -3,7 +3,7 @@ import { ArcadeSound } from "./audio";
 import { issueRun, type RankedRun } from "./api";
 import { loadGame } from "./catalog";
 import { ReplayRecorder } from "./replay";
-import { Stage } from "./scene";
+import type { Stage } from "./scene";
 import { preference } from "./preferences";
 import { DT, MAX_TICKS, type ArcadeSimulation, type ArcadeView, type GameDefinition, type GameId, type NewGameId, type ReplayInput } from "./shared/contracts";
 
@@ -21,6 +21,7 @@ export class ArcadeController {
   definition: GameDefinition | null = null;
   input: ArcadeControls | null = null;
   stage: Stage | null = null;
+  private StageClass: typeof Stage | null = null;
   phase: Phase = "loading";
   countdown = 0;
   ranked: RankedRun | null = null;
@@ -40,9 +41,10 @@ export class ArcadeController {
   get paused(): boolean { return this.phase !== "playing"; }
   get active(): boolean { return ["playing", "paused", "countdown", "preparing"].includes(this.phase); }
   async load(): Promise<void> {
-    const definition = await loadGame(this.selection);
+    const [definition, scene] = await Promise.all([loadGame(this.selection), import("./scene")]);
     if (this.phase === "disposed") return;
     this.definition = definition;
+    this.StageClass = scene.Stage;
     this.callbacks.overlay("loading", definition.title, "Warming up the cabinet…");
     if (!this.build(1980)) return;
     this.phase = "intro";
@@ -51,11 +53,12 @@ export class ArcadeController {
   }
   private build(seed: number): boolean {
     this.releaseScene();
-    if (!this.definition) return false;
+    if (!this.definition || !this.StageClass) return false;
+    const StageClass = this.StageClass;
     this.simulation = this.definition.createSimulation(seed);
     this.recorder = new ReplayRecorder(); this.accumulator = 0; this.lastTime = 0;
     try {
-      const stage = new Stage(this.mount, () => {
+      const stage = new StageClass(this.mount, () => {
         if (this.stage !== stage || this.phase === "disposed") return;
         this.beforeContextLoss = this.phase;
         this.pause();

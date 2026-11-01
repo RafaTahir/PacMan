@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { createSimulation, type OrbitState } from '../src/arcade/games/orbit-salvage/model';
+import { createSimulation } from '../src/arcade/games/orbit-salvage/model';
 import { MAX_TICKS,NEUTRAL_INPUT,Buttons } from '../src/arcade/shared/contracts';
 const input=(overrides={})=>({...NEUTRAL_INPUT,...overrides});
 describe('Orbit Salvage',()=>{

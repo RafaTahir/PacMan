@@ -17,6 +17,8 @@ export default defineConfig({
     },
   } } },
   build: {
+    // The Three.js chunk is ~580 kB and is lazy-loaded; only the home page's own code is preloaded.
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       input: { arcade: resolve("index.html"), pacman: resolve("pacman.html") },
       output: { manualChunks: { three: ["three"] } },

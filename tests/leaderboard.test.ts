@@ -436,8 +436,9 @@ describe("persistent D1 leaderboards", () => {
     expect(board.entries[99].rank).toBe(100);
   });
   it("limits polling and finishing requests", async () => {
-    for (let index = 0; index < 120; index++) expect((await request("/api/leaderboards?game=pacman")).status).toBe(200);
-    expect((await request("/api/leaderboards?game=pacman")).status).toBe(429);
+    for (let index = 0; index < 100; index++) expect((await request(`/api/leaderboards?game=pacman&limit=${index + 1}`)).status).toBe(200);
+    for (let index = 0; index < 20; index++) expect((await request(`/api/leaderboards?game=pacman&scope=daily&limit=${index + 1}`)).status).toBe(200);
+    expect((await request("/api/leaderboards?game=neon-rally")).status).toBe(429);
     for (let index = 0; index < 18; index++) expect((await request(`/api/runs/${crypto.randomUUID()}/finish`, {})).status).toBe(404);
     expect((await request(`/api/runs/${crypto.randomUUID()}/finish`, {})).status).toBe(429);
   });
@@ -564,5 +565,55 @@ describe("additive ten-cabinet storage", () => {
     expect(result.status).toBe(409);
     expect(await bodyOf(result)).toMatchObject({ error: { code: "ruleset_mismatch" } });
     expect(db.sqlite.prepare("SELECT status FROM runs WHERE id = ?").get(run.runId)?.status).toBe("issued");
+  });
+});
+
+describe("scalability and hardening", () => {
+  it("serves repeated identical board polls from a short cache without D1 reads or rate-limit writes", async () => {
+    expect((await request("/api/leaderboards?game=pacman")).status).toBe(200);
+    const statements = db.statements.length;
+    for (let index = 0; index < 50; index++) expect((await request("/api/leaderboards?game=pacman")).status).toBe(200);
+    expect(db.statements.length).toBe(statements);
+    clock += 10_001;
+    expect((await request("/api/leaderboards?game=pacman")).status).toBe(200);
+    expect(db.statements.length).toBeGreaterThan(statements);
+  });
+  it("shows a newly accepted score on the board immediately despite the cache", async () => {
+    expect((await bodyOf(await request("/api/leaderboards?game=reactor-breaker"))).entries).toHaveLength(0);
+    const run = await start("reactor-breaker");
+    clock += 130_000;
+    expect((await finish(run)).status).toBe(200);
+    expect((await bodyOf(await request("/api/leaderboards?game=reactor-breaker"))).entries).toHaveLength(1);
+  });
+  it("sends a restrictive CSP and privacy headers on API and static responses", async () => {
+    env.ASSETS = { fetch: async () => new Response("asset") };
+    for (const path of ["/api/health", "/index.html", "/pacman.html"]) {
+      const response = await request(path);
+      const csp = response.headers.get("content-security-policy")!;
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("frame-ancestors 'self'");
+      expect(csp).toContain("object-src 'none'");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(csp.includes("script-src 'self' 'unsafe-inline'")).toBe(path === "/pacman.html");
+    }
+  });
+  it("drains expired counters and abandoned tickets in bounded batches via the scheduled handler", async () => {
+    db.sqlite.exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i < 250) INSERT INTO rate_limits (key,count,expires_at) SELECT 'old-'||i,1,1 FROM n");
+    db.sqlite.exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i < 250) INSERT INTO runs (id,game,ruleset,seed,issued_at,expires_at,status) SELECT 'stale-'||i,'pacman','after-hours-v2',1,0,1,'issued' FROM n");
+    db.sqlite.exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i < 120) INSERT INTO cabinet_runs (id,game,ruleset,seed,issued_at,expires_at,status) SELECT 'cstale-'||i,'orbit-salvage','after-hours-v2',1,0,1,'issued' FROM n");
+    await worker.scheduled(undefined, { ...env, DB: db });
+    expect(db.sqlite.prepare("SELECT COUNT(*) AS n FROM rate_limits WHERE expires_at < ?").get(clock)?.n).toBe(0);
+    expect(db.sqlite.prepare("SELECT COUNT(*) AS n FROM runs").get()?.n).toBe(0);
+    expect(db.sqlite.prepare("SELECT COUNT(*) AS n FROM cabinet_runs").get()?.n).toBe(0);
+  });
+  it("gives replay verification its own tighter per-network budget", async () => {
+    const runs = [];
+    for (let index = 0; index < 7; index++) runs.push(await start("canopy-sprint"));
+    clock += 130_000;
+    const codes = [];
+    for (const run of runs) codes.push((await request(`/api/runs/${run.runId}/finish`, { initials: "ACE", frames: 7200, inputs: [], score: 1 })).status);
+    expect(codes.slice(0, 6).every((code) => code !== 429)).toBe(true);
+    expect(codes[6]).toBe(429);
   });
 });

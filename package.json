@@ -14,17 +14,23 @@
     "db:generate": "drizzle-kit generate",
     "test:arcade": "vitest run tests/*rally* tests/*breaker* tests/*siege* tests/*pinball* tests/arcade-runtime.test.ts tests/leaderboard*.test.ts",
     "build:sites": "npm run build && node scripts/package-sites.mjs",
-    "test:sites": "vitest run tests/sites-assets.test.ts && node scripts/smoke-sites.mjs"
+    "test:sites": "vitest run tests/sites-assets.test.ts && node scripts/smoke-sites.mjs",
+    "lint": "eslint .",
+    "format:check": "prettier --check .prettierrc.json eslint.config.js .github"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
     "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.4",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^7.1.12",
-    "vitest": "^3.2.4",
+    "vitest": "^5.0.5",
     "wrangler": "^4.152.0"
   },
   "dependencies": {

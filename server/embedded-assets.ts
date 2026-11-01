@@ -19,6 +19,7 @@ export function createEmbeddedAssets(manifest: EmbeddedManifest) {
       let path: string;
       try { path = decodeURIComponent(new URL(request.url).pathname); }
       catch { return text("Invalid asset path.", 400, head); }
+      // eslint-disable-next-line no-control-regex -- control characters are exactly what is rejected here
       if (/[\\\u0000-\u001f]/.test(path) || path.split("/").some(part => part === "." || part === ".."))
         return text("Invalid asset path.", 400, head);
       // Never turn an API typo into an HTML SPA response.

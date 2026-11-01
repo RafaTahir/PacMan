@@ -35,7 +35,10 @@ await build({
 import { createEmbeddedAssets } from './server/embedded-assets.ts';
 import manifest from 'arcade:embedded-assets';
 const ASSETS = createEmbeddedAssets(manifest);
-export default { fetch(request, env, context) { return app.fetch(request, { ...env, ASSETS }, context); } };`,
+export default {
+  fetch(request, env, context) { return app.fetch(request, { ...env, ASSETS }, context); },
+  scheduled(event, env, context) { return app.scheduled?.(event, env, context); },
+};`,
     sourcefile: "sites-entry.js", resolveDir: root, loader: "js" },
   plugins: [{ name: "embedded-static-assets", setup(builder) {
     builder.onResolve({ filter: /^arcade:embedded-assets$/ }, () => ({ path: "manifest", namespace: "arcade-assets" }));

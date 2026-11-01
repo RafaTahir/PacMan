@@ -1,7 +1,7 @@
 import { GAME_IDS, RULESET_VERSION, type GameId } from "../src/arcade/shared/contracts";
 import { type D1Database, type D1Result, type D1Statement, type Env, successful } from "./d1";
 import { ApiError } from "./errors";
-import { additionalCabinetStore, storeForGame } from "./cabinet-store";
+import { cabinetStore, legacyStore, storeForGame, type Store } from "./cabinet-store";
 import { validateInitials } from "./initials";
 import { replayScore, runLimits, validateReplay } from "./replay";
 
@@ -12,6 +12,8 @@ const MAX_SCORE = Number.MAX_SAFE_INTEGER;
 const CLAIM_LEASE_MS = 30_000;
 const HEALTH_CACHE_MS = 10_000;
 const BLOCKED_CACHE_LIMIT = 2048;
+const BOARD_CACHE_SECONDS = 10;
+const PRUNE_BATCH = 100;
 const saltCache = new WeakMap<D1Database, string>();
 const blockedRates = new Map<string, number>();
 const healthCache = new WeakMap<D1Database, { checkedAt: number; connected: boolean }>();
@@ -22,11 +24,10 @@ interface ScoreRow { run_id: string; initials: string; score: number; finished_a
 interface AcceptedScoreRow extends ScoreRow { frames: number; replay_hash: string }
 export interface LeaderboardEntry { rank: number | null; initials: string; score: number; runId: string; finishedAt: string; verified: true }
 
+const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
+const shouldSweep = (): boolean => (crypto.getRandomValues(new Uint8Array(1))[0] & 31) === 0;
 function json(value: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extraHeaders },
-  });
+  return new Response(JSON.stringify(value), { status, headers: { ...JSON_HEADERS, ...extraHeaders } });
 }
 function gameId(value: unknown): GameId {
   if (typeof value !== "string" || !GAME_IDS.includes(value as GameId)) throw new ApiError(400, "invalid_game", "Choose a supported arcade game.");
@@ -100,7 +101,7 @@ async function rateSalt(db: D1Database, env: Env): Promise<string> {
   saltCache.set(db, row.value);
   return row.value;
 }
-async function rateLimit(request: Request, db: D1Database, env: Env, action: "start" | "finish" | "board", now: number): Promise<void> {
+async function rateLimit(request: Request, db: D1Database, env: Env, action: "start" | "finish" | "verify" | "board", now: number): Promise<void> {
   const windowMs = 60_000;
   const bucket = Math.floor(now / windowMs);
   const bucketEnds = (bucket + 1) * windowMs;
@@ -108,7 +109,7 @@ async function rateLimit(request: Request, db: D1Database, env: Env, action: "st
   // requests share an anonymous bucket; identity headers are never trusted.
   const network = request.headers.get("CF-Connecting-IP") || "unknown-network";
   const key = await digest(`${await rateSalt(db, env)}\u0000${network}\u0000${action}\u0000${bucket}`);
-  const maximum = action === "start" ? 12 : action === "finish" ? 18 : 120;
+  const maximum = action === "start" ? 12 : action === "finish" ? 18 : action === "verify" ? 6 : 120;
   const deny = (): never => {
     if (!blockedRates.has(key) && blockedRates.size >= BLOCKED_CACHE_LIMIT) blockedRates.delete(blockedRates.keys().next().value!);
     blockedRates.set(key, bucketEnds);
@@ -129,6 +130,14 @@ function serializeEntry(row: ScoreRow, rank: number | null): LeaderboardEntry {
 function method(request: Request, expected: string): void {
   if (request.method !== expected) throw new ApiError(405, "method_not_allowed", `Use ${expected} for this endpoint.`);
 }
+interface CachedBoard { expiresAt: number; body: string }
+const boardCaches = new WeakMap<D1Database, Map<string, CachedBoard>>();
+const BOARD_CACHE_ENTRIES = 256;
+function boardCache(db: D1Database): Map<string, CachedBoard> {
+  let cache = boardCaches.get(db);
+  if (!cache) { cache = new Map(); boardCaches.set(db, cache); }
+  return cache;
+}
 async function leaderboard(request: Request, url: URL, db: D1Database, env: Env, now: number): Promise<Response> {
   method(request, "GET");
   for (const name of url.searchParams.keys()) {
@@ -145,13 +154,23 @@ async function leaderboard(request: Request, url: URL, db: D1Database, env: Env,
   const day = url.searchParams.get("day") ?? today;
   if ((scope === "all" && url.searchParams.has("day")) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(Date.parse(`${day}T00:00:00Z`)) || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day || day > today)
     throw new ApiError(400, "invalid_day", "Use a valid UTC date up to today with the daily board.");
+  // Identical boards are served from a short-lived isolate cache: repeated polls
+  // cost no D1 reads or rate-limit writes.
+  const cache = boardCache(db);
+  const cacheKey = `${game}|${scope}|${day}|${limitText}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return new Response(cached.body, { status: 200, headers: JSON_HEADERS });
   await rateLimit(request, db, env, "board", now);
-  db = storeForGame(db, game);
+  const store = storeForGame(game);
   const query = scope === "daily"
-    ? db.prepare("SELECT run_id, initials, score, finished_at FROM scores WHERE game = ? AND finished_day = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?").bind(game, day, Number(limitText))
-    : db.prepare("SELECT run_id, initials, score, finished_at FROM scores WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?").bind(game, Number(limitText));
+    ? db.prepare(`SELECT run_id, initials, score, finished_at FROM ${store.scores} WHERE game = ? AND finished_day = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?`).bind(game, day, Number(limitText))
+    : db.prepare(`SELECT run_id, initials, score, finished_at FROM ${store.scores} WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?`).bind(game, Number(limitText));
   const rows = successful(await query.all<ScoreRow>()).results ?? [];
-  return json({ game, scope, ...(scope === "daily" ? { day } : {}), entries: rows.map((row, index) => serializeEntry(row, index + 1)), updatedAt: new Date(now).toISOString() });
+  const body = JSON.stringify({ game, scope, ...(scope === "daily" ? { day } : {}), entries: rows.map((row, index) => serializeEntry(row, index + 1)), updatedAt: new Date(now).toISOString() });
+  if (!cache.has(cacheKey) && cache.size >= BOARD_CACHE_ENTRIES) cache.delete(cache.keys().next().value!);
+  cache.set(cacheKey, { expiresAt: now + BOARD_CACHE_SECONDS * 1000, body });
+  if (shouldSweep()) await pruneExpired(db, now).catch(() => {});
+  return new Response(body, { status: 200, headers: JSON_HEADERS });
 }
 async function startRun(request: Request, db: D1Database, env: Env, clock: () => number): Promise<Response> {
   method(request, "POST");
@@ -165,25 +184,40 @@ async function startRun(request: Request, db: D1Database, env: Env, clock: () =>
   // A slow request-body upload must not count as time playing an unknown seed.
   const issuedAt = clock();
   const expiresAt = issuedAt + RUN_LIFETIME_MS;
-  await execute(storeForGame(db, game).prepare("INSERT INTO runs (id, game, ruleset, seed, issued_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, 'issued')").bind(runId, game, RULESET_VERSION, seed, issuedAt, expiresAt));
-  if ((crypto.getRandomValues(new Uint8Array(1))[0] & 31) === 0) await pruneExpired(db, issuedAt);
+  const store = storeForGame(game);
+  await execute(db.prepare(`INSERT INTO ${store.runs} (id, game, ruleset, seed, issued_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, 'issued')`).bind(runId, game, RULESET_VERSION, seed, issuedAt, expiresAt));
+  if (shouldSweep()) await pruneExpired(db, issuedAt).catch(() => {});
   return json({ runId, seed, game, ruleset: RULESET_VERSION, ...runLimits(game), expiresAt: new Date(expiresAt).toISOString() }, 201);
 }
-export async function pruneExpired(db: D1Database, now: number): Promise<void> {
-  await batch(db, [
-    db.prepare("DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at < ? ORDER BY expires_at LIMIT 100)").bind(now),
-    // Partial index excludes permanent accepted history; each sweep handles
-    // at most 100 abandoned tickets, independent of the accepted row count.
-    db.prepare("DELETE FROM runs WHERE id IN (SELECT id FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' AND expires_at < ? ORDER BY expires_at LIMIT 100) AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(now),
-    additionalCabinetStore(db).prepare("DELETE FROM runs WHERE id IN (SELECT id FROM runs INDEXED BY runs_pending_expiry_idx WHERE status != 'accepted' AND expires_at < ? ORDER BY expires_at LIMIT 100) AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(now),
+const pruneRunsSql = (store: Store): string =>
+  // Partial index excludes permanent accepted history; each sweep handles at most
+  // PRUNE_BATCH abandoned tickets, independent of the accepted row count.
+  `DELETE FROM ${store.runs} WHERE id IN (SELECT id FROM ${store.runs} INDEXED BY ${store.pendingExpiryIndex} WHERE status != 'accepted' AND expires_at < ? ORDER BY expires_at LIMIT ${PRUNE_BATCH}) AND NOT EXISTS (SELECT 1 FROM ${store.scores} WHERE ${store.scores}.run_id = ${store.runs}.id)`;
+/** Deletes one bounded batch of expired counters and abandoned tickets; returns rows removed. */
+export async function pruneExpired(db: D1Database, now: number): Promise<number> {
+  const results = await batch(db, [
+    db.prepare(`DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at < ? ORDER BY expires_at LIMIT ${PRUNE_BATCH})`).bind(now),
+    db.prepare(pruneRunsSql(legacyStore)).bind(now),
+    db.prepare(pruneRunsSql(cabinetStore)).bind(now),
   ]);
+  return results.reduce((total, result) => total + (result.meta.changes ?? 0), 0);
 }
-async function acceptedRow(db: D1Database, runId: string): Promise<AcceptedScoreRow | null> {
-  return db.prepare("SELECT run_id, initials, score, frames, finished_at, replay_hash FROM scores WHERE run_id = ?").bind(runId).first<AcceptedScoreRow>();
+/** Scheduled cleanup: drains expired rows in bounded batches so read-only traffic cannot grow the tables. */
+export async function sweepExpired(db: D1Database, now: number, maxBatches = 20): Promise<number> {
+  let total = 0;
+  for (let index = 0; index < maxBatches; index++) {
+    const removed = await pruneExpired(db, now);
+    total += removed;
+    if (removed === 0) break;
+  }
+  return total;
 }
-async function boundedRank(db: D1Database, game: GameId, runId: string): Promise<number | null> {
+async function acceptedRow(db: D1Database, store: Store, runId: string): Promise<AcceptedScoreRow | null> {
+  return db.prepare(`SELECT run_id, initials, score, frames, finished_at, replay_hash FROM ${store.scores} WHERE run_id = ?`).bind(runId).first<AcceptedScoreRow>();
+}
+async function boundedRank(db: D1Database, store: Store, game: GameId, runId: string): Promise<number | null> {
   try {
-    const rows = successful(await db.prepare("SELECT run_id FROM scores WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT 100").bind(game).all<{ run_id: string }>()).results ?? [];
+    const rows = successful(await db.prepare(`SELECT run_id FROM ${store.scores} WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT 100`).bind(game).all<{ run_id: string }>()).results ?? [];
     const position = rows.findIndex((row) => row.run_id === runId);
     return position < 0 ? null : position + 1;
   } catch {
@@ -195,16 +229,16 @@ async function boundedRank(db: D1Database, game: GameId, runId: string): Promise
 async function replayDigest(run: RunRow, frames: number, inputs: unknown): Promise<string> {
   return digest(JSON.stringify({ ruleset: run.ruleset, game: run.game, seed: run.seed, frames, inputs }));
 }
-async function recoveredResponse(db: D1Database, run: RunRow, body: JsonObject, row: AcceptedScoreRow): Promise<Response> {
+async function recoveredResponse(db: D1Database, store: Store, run: RunRow, body: JsonObject, row: AcceptedScoreRow): Promise<Response> {
   const initials = validateInitials(body.initials);
   const replay = validateReplay(run.game, body.frames, body.inputs);
   const replayHash = await replayDigest(run, replay.frames, replay.inputs);
   if (initials !== row.initials || replay.frames !== row.frames || replayHash !== row.replay_hash || (body.score !== undefined && body.score !== row.score))
     throw new ApiError(409, "run_already_submitted", "This run was already accepted with a different submission.");
-  return json({ accepted: true, entry: serializeEntry(row, await boundedRank(db, run.game, run.id)), score: row.score, verified: true, replayed: true });
+  return json({ accepted: true, entry: serializeEntry(row, await boundedRank(db, store, run.game, run.id)), score: row.score, verified: true, replayed: true });
 }
-async function releaseClaim(db: D1Database, runId: string, token: string): Promise<void> {
-  await execute(db.prepare("UPDATE runs SET status = 'issued', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(runId, token));
+async function releaseClaim(db: D1Database, store: Store, runId: string, token: string): Promise<void> {
+  await execute(db.prepare(`UPDATE ${store.runs} SET status = 'issued', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND NOT EXISTS (SELECT 1 FROM ${store.scores} WHERE ${store.scores}.run_id = ${store.runs}.id)`).bind(runId, token));
 }
 async function finishRun(request: Request, runId: string, db: D1Database, env: Env, clock: () => number): Promise<Response> {
   method(request, "POST");
@@ -213,18 +247,18 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
   const body = await readJson(request);
   fields(body, ["initials", "frames", "inputs", "score"]);
   const now = clock();
-  const lookup = "SELECT id, game, ruleset, seed, issued_at, expires_at, status, claim_token, claim_expires_at FROM runs WHERE id = ?";
-  let run = await db.prepare(lookup).bind(runId).first<RunRow>();
+  const lookup = (store: Store): string => `SELECT id, game, ruleset, seed, issued_at, expires_at, status, claim_token, claim_expires_at FROM ${store.runs} WHERE id = ?`;
+  let store = legacyStore;
+  let run = await db.prepare(lookup(store)).bind(runId).first<RunRow>();
   if (!run) {
-    const extra = additionalCabinetStore(db);
-    run = await extra.prepare(lookup).bind(runId).first<RunRow>();
-    if (run) db = extra;
+    run = await db.prepare(lookup(cabinetStore)).bind(runId).first<RunRow>();
+    if (run) store = cabinetStore;
   }
   if (!run) throw new ApiError(404, "run_not_found", "Ranked run not found.");
   if (run.status === "accepted") {
-    const row = await acceptedRow(db, runId);
+    const row = await acceptedRow(db, store, runId);
     if (!row) throw new Error("Accepted score unavailable");
-    return recoveredResponse(db, run, body, row);
+    return recoveredResponse(db, store, run, body, row);
   }
   if (run.status === "rejected") throw new ApiError(409, "run_already_submitted", "This run has already been rejected.");
   if (now >= run.expires_at) throw new ApiError(410, "run_expired", "This ranked run has expired. Start a new game.");
@@ -236,11 +270,14 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
     throw new ApiError(409, "too_early", "The ranked run has not had enough time to complete.", Math.ceil(((body.frames as number) * 1000 / tickRate - (now - run.issued_at) - CLOCK_TOLERANCE_MS) / 1000));
   if (run.status === "verifying" && run.claim_expires_at !== null && run.claim_expires_at > now)
     throw new ApiError(409, "run_in_progress", "This run is being verified. Retry the same submission shortly.", Math.ceil((run.claim_expires_at - now) / 1000));
+  // Replay verification is the expensive step, so it has its own tighter budget,
+  // charged before a claim is taken and only for submissions that reach it.
+  await rateLimit(request, db, env, "verify", now);
   const token = crypto.randomUUID();
-  const claim = await execute(db.prepare("UPDATE runs SET status = 'verifying', claim_token = ?, claim_expires_at = ? WHERE id = ? AND expires_at > ? AND (status = 'issued' OR (status = 'verifying' AND (claim_expires_at IS NULL OR claim_expires_at <= ?)))").bind(token, now + CLAIM_LEASE_MS, runId, now, now));
+  const claim = await execute(db.prepare(`UPDATE ${store.runs} SET status = 'verifying', claim_token = ?, claim_expires_at = ? WHERE id = ? AND expires_at > ? AND (status = 'issued' OR (status = 'verifying' AND (claim_expires_at IS NULL OR claim_expires_at <= ?)))`).bind(token, now + CLAIM_LEASE_MS, runId, now, now));
   if (claim.meta.changes !== 1) {
-    const row = await acceptedRow(db, runId);
-    if (row) return recoveredResponse(db, run, body, row);
+    const row = await acceptedRow(db, store, runId);
+    if (row) return recoveredResponse(db, store, run, body, row);
     throw new ApiError(409, "run_in_progress", "This run is being verified. Retry the same submission shortly.", 1);
   }
   let score: number;
@@ -256,9 +293,9 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
     replayHash = await replayDigest(run, frames, replay.inputs);
   } catch (error) {
     if (error instanceof ApiError) {
-      await execute(db.prepare("UPDATE runs SET status = 'rejected', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(runId, token));
+      await execute(db.prepare(`UPDATE ${store.runs} SET status = 'rejected', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND NOT EXISTS (SELECT 1 FROM ${store.scores} WHERE ${store.scores}.run_id = ${store.runs}.id)`).bind(runId, token));
     } else {
-      await releaseClaim(db, runId, token).catch(() => {});
+      await releaseClaim(db, store, runId, token).catch(() => {});
     }
     throw error;
   }
@@ -268,26 +305,43 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
     // Both writes are transactional and token-guarded: an expired verifier
     // cannot commit after another request has acquired the recovered claim.
     const committed = await batch(db, [
-      db.prepare("INSERT INTO scores (run_id, game, ruleset, initials, score, frames, finished_at, finished_day, replay_hash) SELECT id, game, ruleset, ?, ?, ?, ?, ?, ? FROM runs WHERE id = ? AND status = 'verifying' AND claim_token = ?").bind(initials, score, frames, finishedAt, day, replayHash, runId, token),
-      db.prepare("UPDATE runs SET status = 'accepted', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND EXISTS (SELECT 1 FROM scores WHERE scores.run_id = runs.id)").bind(runId, token),
+      db.prepare(`INSERT INTO ${store.scores} (run_id, game, ruleset, initials, score, frames, finished_at, finished_day, replay_hash) SELECT id, game, ruleset, ?, ?, ?, ?, ?, ? FROM ${store.runs} WHERE id = ? AND status = 'verifying' AND claim_token = ?`).bind(initials, score, frames, finishedAt, day, replayHash, runId, token),
+      db.prepare(`UPDATE ${store.runs} SET status = 'accepted', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND EXISTS (SELECT 1 FROM ${store.scores} WHERE ${store.scores}.run_id = ${store.runs}.id)`).bind(runId, token),
     ]);
+    boardCaches.delete(db);
     if (committed[0]?.meta.changes !== 1 || committed[1]?.meta.changes !== 1) {
-      const row = await acceptedRow(db, runId);
-      if (row) return recoveredResponse(db, run, body, row);
+      const row = await acceptedRow(db, store, runId);
+      if (row) return recoveredResponse(db, store, run, body, row);
       throw new ApiError(409, "run_in_progress", "A newer verifier owns this run. Retry shortly.", 1);
     }
   } catch (error) {
     // This also handles an ambiguous transport error after COMMIT: do not
     // reset an accepted run, and return its durable result when readable.
-    await releaseClaim(db, runId, token).catch(() => {});
-    const row = await acceptedRow(db, runId).catch(() => null);
-    if (row) return recoveredResponse(db, run, body, row);
+    await releaseClaim(db, store, runId, token).catch(() => {});
+    const row = await acceptedRow(db, store, runId).catch(() => null);
+    if (row) return recoveredResponse(db, store, run, body, row);
     throw error;
   }
-  return json({ accepted: true, entry: serializeEntry({ run_id: runId, initials, score, finished_at: finishedAt }, await boundedRank(db, run.game, runId)), score, verified: true });
+  return json({ accepted: true, entry: serializeEntry({ run_id: runId, initials, score, finished_at: finishedAt }, await boundedRank(db, store, run.game, runId)), score, verified: true });
 }
 
+// The game is fully self-hosted: no third-party scripts, styles, fonts or frames.
+// The preserved offline Pac-Man page inlines its own bundle, so it alone needs inline scripts.
+const CSP_BASE = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'self'; frame-ancestors 'self'; worker-src 'none'";
+export const CSP_ARCADE = `${CSP_BASE}; script-src 'self'; style-src 'self' 'unsafe-inline'`;
+export const CSP_PACMAN = `${CSP_BASE}; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'`;
+function withSecurityHeaders(response: Response, pathname: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Content-Security-Policy", pathname === "/pacman.html" ? CSP_PACMAN : CSP_ARCADE);
+  headers.set("Referrer-Policy", "no-referrer");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 export async function handleRequest(request: Request, env: Env, clock: () => number = () => Date.now()): Promise<Response> {
+  return withSecurityHeaders(await route(request, env, clock), new URL(request.url).pathname);
+}
+async function route(request: Request, env: Env, clock: () => number): Promise<Response> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) {
     if (env.ASSETS) return env.ASSETS.fetch(request);
