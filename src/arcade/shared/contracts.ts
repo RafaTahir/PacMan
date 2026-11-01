@@ -4,9 +4,9 @@ export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 export const MAX_TICKS = TICK_RATE * 120;
 export const RULESET_VERSION = "after-hours-v2";
-export type NewGameId = "neon-rally" | "reactor-breaker" | "chrome-siege" | "midnight-pinball" | "orbit-salvage" | "tidal-courier" | "prism-circuit" | "skybound-stack" | "canopy-sprint";
+export type NewGameId = "neon-rally" | "reactor-breaker" | "chrome-siege" | "midnight-pinball" | "orbit-salvage" | "tidal-courier" | "prism-circuit" | "skybound-stack" | "canopy-sprint" | "hollow-bureau";
 export type GameId = "pacman" | NewGameId;
-export const GAME_IDS: readonly GameId[] = ["pacman", "neon-rally", "reactor-breaker", "chrome-siege", "midnight-pinball", "orbit-salvage", "tidal-courier", "prism-circuit", "skybound-stack", "canopy-sprint"];
+export const GAME_IDS: readonly GameId[] = ["pacman", "neon-rally", "reactor-breaker", "chrome-siege", "midnight-pinball", "orbit-salvage", "tidal-courier", "prism-circuit", "skybound-stack", "canopy-sprint", "hollow-bureau"];
 export const Buttons = { PRIMARY: 1, SECONDARY: 2, LAUNCH: 4, POINTER: 8 } as const;
 
 /** Signed integer axes (-127..127). Aim is a direction; breaker uses aimX as

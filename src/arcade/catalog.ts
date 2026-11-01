@@ -10,6 +10,7 @@ export const cabinets: { id: GameId; title: string; genre: string; copy: string;
   { id: "prism-circuit", title: "PRISM CIRCUIT", genre: "LIGHT PATH PUZZLE", copy: "Turn a connection into a revelation.", accent: "#ff9cda", number: "08", glyph: "◇" },
   { id: "skybound-stack", title: "SKYBOUND STACK", genre: "FALLING BLOCK PUZZLE", copy: "Find the gap. Clear the skyline.", accent: "#ffcb77", number: "09", glyph: "▦" },
   { id: "canopy-sprint", title: "CANOPY SPRINT", genre: "TROPICAL TRAIL RUN", copy: "Above the palms. Ahead of trouble.", accent: "#b2e875", number: "10", glyph: "↟" },
+  { id: "hollow-bureau", title: "HOLLOW BUREAU", genre: "BRUTALIST BEAT SHOOTER", copy: "Fire on the pulse. Hold the archive.", accent: "#ff3b2f", number: "11", glyph: "▣" },
 ];
 const loaders: Record<NewGameId, () => Promise<{ default: GameDefinition }>> = {
   "neon-rally": () => import("./games/neon-rally"),
@@ -21,5 +22,6 @@ const loaders: Record<NewGameId, () => Promise<{ default: GameDefinition }>> = {
   "prism-circuit": () => import("./games/prism-circuit"),
   "skybound-stack": () => import("./games/skybound-stack"),
   "canopy-sprint": () => import("./games/canopy-sprint"),
+  "hollow-bureau": () => import("./games/hollow-bureau"),
 };
 export const loadGame = (id: NewGameId) => loaders[id]().then(module => module.default);

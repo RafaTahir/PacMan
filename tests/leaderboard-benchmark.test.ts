@@ -15,6 +15,7 @@ function activeInput(game: GameId, tick: number): ArcadeInput {
   if (game === "prism-circuit") return { x: phase === 0 ? 127 : phase === 2 ? -127 : 0, y: phase === 1 ? 127 : phase === 3 ? -127 : 0, aimX: 0, aimY: -127, buttons: tick % 24 < 2 ? 1 : tick % 240 < 2 ? 2 : 0 };
   if (game === "skybound-stack") return { x: phase === 0 ? -127 : phase === 2 ? 127 : 0, y: tick % 90 < 10 ? 127 : 0, aimX: 0, aimY: -127, buttons: tick % 35 < 2 ? 1 : tick % 120 < 2 ? 2 : 0 };
   if (game === "canopy-sprint") return { x: phase === 0 ? -127 : phase === 2 ? 127 : 0, y: 0, aimX: 0, aimY: -127, buttons: tick % 100 < 2 ? 1 : tick % 100 > 60 && tick % 100 < 75 ? 2 : 0 };
+  if (game === "hollow-bureau") return { x: Math.round(Math.sin(tick / 140) * 127), y: Math.round(Math.cos(tick / 140) * 127), aimX: Math.round(Math.cos(tick / 20) * 127), aimY: Math.round(Math.sin(tick / 20) * 127), buttons: 1 | (tick % 180 < 12 ? 2 : 0) };
   return { x: 0, y: 0, aimX: 0, aimY: -127, buttons: (tick % 100 < 70 ? 4 : 0) | (tick % 30 < 15 ? 1 : 2) };
 }
 function sample(game: GameId, seed: number, active: boolean): { frames: number; inputs: ReplayInput[]; score: number } {

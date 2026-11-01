@@ -65,7 +65,7 @@ export const cabinetRuns = sqliteTable("cabinet_runs", {
   index("cabinet_runs_expiry_idx").on(table.expiresAt),
   index("cabinet_runs_pending_expiry_idx").on(table.expiresAt).where(sql`${table.status} != 'accepted'`),
   check("cabinet_runs_status_check", sql`${table.status} in ('issued','verifying','accepted','rejected')`),
-  check("cabinet_runs_game_check", sql`${table.game} in ('orbit-salvage','tidal-courier','prism-circuit','skybound-stack','canopy-sprint')`),
+  check("cabinet_runs_game_check", sql`${table.game} in ('orbit-salvage','tidal-courier','prism-circuit','skybound-stack','canopy-sprint','hollow-bureau')`),
   check("cabinet_runs_seed_check", sql`${table.seed} between 1 and 4294967295`),
 ]);
 export const cabinetScores = sqliteTable("cabinet_scores", {

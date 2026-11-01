@@ -1,6 +1,6 @@
 # Persistent global leaderboards
 
-Every game has a global all-time leaderboard backed by the deployment's D1 `DB` binding. The ten game IDs are `pacman`, `neon-rally`, `reactor-breaker`, `chrome-siege`, `midnight-pinball`, `orbit-salvage`, `tidal-courier`, `prism-circuit`, `skybound-stack`, and `canopy-sprint`. Boards are empty until people submit accepted runs. No competitors or production scores are preloaded.
+Every game has a global all-time leaderboard backed by the deployment's D1 `DB` binding. The eleven game IDs are `pacman`, `neon-rally`, `reactor-breaker`, `chrome-siege`, `midnight-pinball`, `orbit-salvage`, `tidal-courier`, `prism-circuit`, `skybound-stack`, `canopy-sprint`, and `hollow-bureau`. Boards are empty until people submit accepted runs. No competitors or production scores are preloaded.
 
 Accepted scores and their run records have **no expiry**. Reloading the browser, opening another device, deploying the Worker again, or moving to a new UTC day preserves them as long as the same D1 database remains bound. Daily boards are additional UTC date filters over that permanent history. Redeployments must reuse the existing Sites database; creating a replacement database creates a different leaderboard.
 

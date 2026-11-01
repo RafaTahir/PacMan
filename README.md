@@ -1,6 +1,6 @@
 # After Hours Arcade
 
-Ten browser cabinets in one arcade: Pac-Man, Neon Rally, Reactor Breaker, Chrome Siege, Malaysian tropical Midnight Pinball, Orbit Salvage, Tidal Courier, Prism Circuit, Skybound Stack and Canopy Sprint. Original procedural 3D meshes, deterministic simulations and keyboard/touch controls keep each cabinet portable. The featured carousel rotates through every game, with manual navigation and a rotation pause control.
+Eleven browser cabinets in one arcade: Pac-Man, Neon Rally, Reactor Breaker, Chrome Siege, Malaysian tropical Midnight Pinball, Orbit Salvage, Tidal Courier, Prism Circuit, Skybound Stack, Canopy Sprint and Hollow Bureau. Original procedural 3D meshes, deterministic simulations and keyboard/touch controls keep each cabinet portable. The featured carousel rotates through every game, with manual navigation and a rotation pause control.
 
 The home page displays **real global, persistent, per-game leaderboards**. All time is the default; Today (UTC) is optional. Accepted records live in D1 independently of browsers and deployments. No competitor scores are seeded. Service failures show an honest error or an explicitly local practice run.
 

@@ -7,7 +7,7 @@ export interface Store {
   readonly scores: string;
   readonly pendingExpiryIndex: string;
 }
-const addedGames: ReadonlySet<GameId> = new Set(["orbit-salvage", "tidal-courier", "prism-circuit", "skybound-stack", "canopy-sprint"]);
+const addedGames: ReadonlySet<GameId> = new Set(["orbit-salvage", "tidal-courier", "prism-circuit", "skybound-stack", "canopy-sprint", "hollow-bureau"]);
 export const isAdditionalCabinet = (game: GameId): boolean => addedGames.has(game);
 export const legacyStore: Store = { runs: "runs", scores: "scores", pendingExpiryIndex: "runs_pending_expiry_idx" };
 export const cabinetStore: Store = { runs: "cabinet_runs", scores: "cabinet_scores", pendingExpiryIndex: "cabinet_runs_pending_expiry_idx" };

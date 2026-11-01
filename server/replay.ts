@@ -9,10 +9,11 @@ import { createSimulation as tidal } from "../src/arcade/games/tidal-courier/mod
 import { createSimulation as prism } from "../src/arcade/games/prism-circuit/model";
 import { createSimulation as skybound } from "../src/arcade/games/skybound-stack/model";
 import { createSimulation as canopy } from "../src/arcade/games/canopy-sprint/model";
+import { createSimulation as bureau } from "../src/arcade/games/hollow-bureau/model";
 import { MAX_TICKS, NEUTRAL_INPUT, TICK_RATE, type ArcadeInput, type GameId, type ReplayInput } from "../src/arcade/shared/contracts";
 import { ApiError } from "./errors";
 
-export const simulationFactories = { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball, "orbit-salvage": orbit, "tidal-courier": tidal, "prism-circuit": prism, "skybound-stack": skybound, "canopy-sprint": canopy };
+export const simulationFactories = { "neon-rally": rally, "reactor-breaker": breaker, "chrome-siege": siege, "midnight-pinball": pinball, "orbit-salvage": orbit, "tidal-courier": tidal, "prism-circuit": prism, "skybound-stack": skybound, "canopy-sprint": canopy, "hollow-bureau": bureau };
 
 export function runLimits(game: GameId): { tickRate: number; maxTicks: number } {
   return game === "pacman"

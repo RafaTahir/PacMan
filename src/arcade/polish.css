@@ -276,3 +276,7 @@ body.high-contrast #quick-play { box-shadow: none; }
 @media (max-width: 640px) { .lineup-banner { margin-top: 20px; } .lineup-banner img { height: 200px; object-fit: cover; aspect-ratio: auto; } }
 body.high-contrast .proof-strip, body.high-contrast .how-steps li { background: #080b09; border-color: #a4b698; }
 body.high-contrast .proof-strip span, body.high-contrast .how-steps p { color: #e2ecd7; }
+
+/* Hollow Bureau: the eleventh cabinet is a full-width row so the grid never ends ragged. */
+.cabinet-card-wide { grid-column: 1 / -1; }
+.cabinet-card-wide .cabinet-art { max-height: 120px; }
