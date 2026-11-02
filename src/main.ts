@@ -6,7 +6,7 @@ import { isWalkable, key } from "./maze";
 import { INTERMISSION_DURATION, renderIntermission } from "./intermission";
 import { setupViewControls } from "./view";
 import { guardedActivation } from "./activation";
-import { ResumeCountdown, powerCue, queuedTurn } from "./experience";
+import { ResumeCountdown, powerCue, queuedTurn, relayCue, RelayAnnouncements } from "./experience";
 import type { Direction, FruitKind, GameEvent, GameState } from "./types";
 import { PACMAN_BRIDGE, PACMAN_MAX_TICKS, PacmanRankedSession, isBridgeEnvelope, type ChildMessage, type PacmanGraphics, type PacmanSettings } from "./pacman-host";
 
@@ -57,6 +57,7 @@ let reducedMotion =
 let playCues = storage.get("cues") !== "off";
 let highContrast = storage.get("contrast") === "high";
 const resumeCountdown = new ResumeCountdown();
+const relayAnnouncements = new RelayAnnouncements();
 let resumingGame: Game | null = null;
 const tipCopy = {
   turns: "Choose your next turn early. The newest direction stays queued until a legal opening.",
@@ -337,6 +338,11 @@ function updateInterface() {
   const state = game().state;
   const over = isOver();
   const power = playCues && !atTitle && !over ? powerCue(state) : null;
+  const relay = !atTitle && !over ? relayCue(state) : null;
+  if (relay && !modalOpen() && !intermission) {
+    const message = relayAnnouncements.next(state);
+    if (message) $("relay-announcer").textContent = message;
+  }
   const turn = playCues && !atTitle && !over ? queuedTurn(state) : null;
   const canCoach = playCues && !atTitle && !over && !modalOpen() &&
     !intermission && !resumeCountdown.active && (state.phase === "ready" || state.paused);
@@ -361,6 +367,7 @@ function updateInterface() {
     modalOpen(),
     resumeCountdown.seconds,
     power?.seconds, power?.ending, power?.edibleCount,
+    relay?.text, relay?.label, relay?.message,
     power ? Math.round(power.progress * 50) : 0,
     turn?.direction, playCues, highContrast, showCoach, coachTip,
   ].join("|");
@@ -414,6 +421,12 @@ function updateInterface() {
           : state.phase === "ready"
             ? `LEVEL ${String(state.level).padStart(2, "0")} · GET READY`
             : power ? power.text : `${state.remaining} DOTS TO GO`;
+  $("relay-status").hidden = !relay;
+  if (relay) {
+    $("relay-status").textContent = relay.message || relay.text;
+    $("relay-status").setAttribute("aria-label", `${relay.message ? `${relay.message}. ` : ""}${relay.label}`);
+    $("relay-status").title = relay.label;
+  }
   $("board-status").textContent = status;
   $("board-status").title = power?.label ?? status;
   $("board-status").setAttribute("aria-label", power?.label ?? status);
@@ -919,7 +932,7 @@ function receiveHost(event: MessageEvent) {
     const twoPlayers = $<HTMLButtonElement>("two-players");
     twoPlayers.disabled = !!rankedConfig;
     twoPlayers.textContent = rankedConfig ? "1 PLAYER · GLOBAL" : "2 PLAYERS";
-    twoPlayers.title = rankedConfig ? "Global challenges use one player and a two-minute limit. Classic local play supports two players." : "Two players alternate after each life.";
+    twoPlayers.title = rankedConfig ? "Global challenges use one player and a two-minute limit. Local Circuit Relay supports two players." : "Two players alternate after each life.";
     if (rankedConfig) {
       setPlayerCount(1);
       startingFromHost = true;

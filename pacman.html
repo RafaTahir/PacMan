@@ -213,6 +213,7 @@
             <div class="lives" id="lives" aria-label="3 lives remaining"></div>
             <div class="play-status">
               <span class="board-status" id="board-status">READY WHEN YOU ARE</span>
+              <span class="relay-status" id="relay-status" hidden></span>
               <span class="input-cue" id="input-cue" role="img" hidden></span>
             </div>
             <div class="footer-rewards">
@@ -338,6 +339,7 @@
         aria-live="polite"
         aria-atomic="true"
       ></p>
+      <p class="sr-only" id="relay-announcer" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
 
     <dialog id="help-dialog" aria-labelledby="help-title">

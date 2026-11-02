@@ -24,3 +24,30 @@ The Canvas compositor draws active/inactive beacon rings, progress/deadline text
 ## Limits
 
 No commercial art, recordings, code, sleeping-ghost trains, procedural endless maze or multiplayer expansion was copied or added. The existing classic maze and characters remain legacy content; new geometric overlays and mechanics are original. This is a substantial original score-attack variation, not feature parity with the referenced commercial games.
+
+## Follow-up correctness and accessibility audit
+
+The audit found that automatic level-clear/ready sequences and ghost-eating score
+holds consumed the relay's absolute deadline despite removing player control.
+Those automatic holds now extend active relay timestamps once per held tick,
+preserving remaining leg time, dot flow, messages and escape protection. Ordinary
+playing and manual pause remain unchanged; expired protection is never revived.
+Both browser and server replay continue to import the same engine.
+
+The cabinet now exposes relay progress/direction/timer/protection through a visible
+DOM status and an accessible descriptive label, alongside the existing Canvas
+artwork. Expiry, flow, circuit completion and ward-hit messages enter a dedicated
+polite live region once per distinct message; frame/countdown updates do not
+repeat announcements. Outer help, practice badges and iframe descriptions now
+accurately name Circuit Relay.
+
+Verification: 241 tests passed across engine, relay, experience, bridge, adapter
+and leaderboard integration suites; TypeScript and diff checks passed. New tests
+exercise a real frightened-ghost score hold, clear-to-ready timer preservation,
+expired-protection nonrevival, presentation purity and announcement deduplication.
+Headless Chromium checked visible status, accessible ward descriptions, one live
+region mutation per message, and no horizontal overflow at 1280×900, 390×844 and
+844×390. Embedded help/practice copy passed. A separate embedded 390×844 run with
+WebGL disabled verified visible and announced expiry in the labelled 2D fallback.
+The ordinary Chromium runs reported the 3D backend; these were software/headless
+browser checks, not hardware-device or exhaustive 3D quality verification.

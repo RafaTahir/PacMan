@@ -106,7 +106,7 @@ function updateMode() {
     : "Practice · local best on this device · no global submission.";
   if (game?.phase !== "ended" && $("score-save-status").textContent !== savingCopy) $("score-save-status").textContent = savingCopy;
   $("play-mode").textContent = !game || ["intro", "loading"].includes(game.phase) ? "FREE PLAY · CHOOSE YOUR RUN"
-    : game.ranked ? "RANKED · REPLAY CHECKED · 2 MIN" : selected === "pacman" ? "CLASSIC LOCAL · ON THIS DEVICE" : "LOCAL PRACTICE · ON THIS DEVICE";
+    : game.ranked ? "RANKED · REPLAY CHECKED · 2 MIN" : selected === "pacman" ? "CIRCUIT RELAY · LOCAL" : "LOCAL PRACTICE · ON THIS DEVICE";
 }
 function updateHud(definition: GameDefinition, simulation: ArcadeSimulation) {
   const score = simulation.state.score;
@@ -153,7 +153,7 @@ async function launch(id: GameId) {
   $("hud-score").textContent = "0"; $("hud-time").textContent = "2:00"; $("hud-extras").replaceChildren();
   if (id === "pacman") {
     document.body.classList.add("playing-pacman"); $("touch-controls").hidden = true;
-    $("play-instructions").textContent = "Arrows / WASD or swipe / D-pad · queue turns early · classic local play or a two-minute ranked challenge.";
+    $("play-instructions").textContent = "Arrows / WASD or swipe / D-pad · queue turns early · link four beacons for a ward · two-minute ranked runs.";
     pacman = new PacmanAdapter($("play-stage"), {
       overlay: showOverlay, result: showResult, notice, isModalOpen: modalOpen,
       fullscreen: () => void toggleFullscreen(),
@@ -238,7 +238,7 @@ function showHelp() {
   if (pacman) {
     if (["intro", "loading", "preparing"].includes(pacman.phase)) {
       pacman.pause(); resumeAfterModal = false;
-      $("instructions-copy").textContent = "Move with arrow keys / WASD, swipe the maze or use its D-pad. Queue a turn before the corner. Clear all 244 dots and power pellets; only frightened ghosts are edible.\n\nClassic local play keeps the original one- or two-player game. Ranked play is a single-player two-minute challenge using a server-issued seed and replay-checked global score.\n\nP pauses, M changes sound, F changes fullscreen. The original game's help explains the four ghost personalities and scoring.";
+      $("instructions-copy").textContent = "Move with arrow keys / WASD, swipe the maze or use its D-pad. Queue a turn before the corner. Clear all 244 dots and power pellets; only frightened ghosts are edible.\n\nCircuit Relay adds numbered beacons: reach each next beacon in about 15 seconds. Four links earn a ward that absorbs one hit. Every 20 consecutive dots adds a flow bonus; a 2.5-second gap breaks the streak. Local play supports one or two players. Ranked play is a single-player two-minute challenge using a server-issued seed and replay-checked global score.\n\nP pauses, M changes sound, F changes fullscreen. The cabinet's help explains the four ghost personalities and scoring.";
       dialogs.instructions.showModal();
     } else pacman.showHelp();
     return;

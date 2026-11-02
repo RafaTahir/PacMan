@@ -298,6 +298,15 @@ export class Game {
     s.phaseTime += TICK_SECONDS;
     s.popups = s.popups.filter((popup) => (popup.ttl -= TICK_SECONDS) > 0);
     if (s.phase === "title" || s.phase === "game-over") return;
+    // Automatic holds take control away, so preserve remaining relay time.
+    // Ordinary playing ticks and manual pause retain their existing clocks.
+    if (s.relay && (s.phase === "ready" || s.phase === "level-clear" || (s.phase === "playing" && this.scorePause > 0))) {
+      const relay = s.relay;
+      if (relay.deadline) relay.deadline++;
+      if (relay.lastDot >= 0) relay.lastDot++;
+      if (relay.messageUntil >= s.frame) relay.messageUntil++;
+      if (relay.graceUntil >= s.frame) relay.graceUntil++;
+    }
     if (s.phase === "ready") {
       if (s.phaseTime + EPSILON >= this.readyDuration) {
         this.setPhase("playing");

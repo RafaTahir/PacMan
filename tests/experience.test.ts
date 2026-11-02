@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Game } from "../src/engine";
-import { powerCue, queuedTurn, ResumeCountdown } from "../src/experience";
+import { powerCue, queuedTurn, ResumeCountdown, relayCue, RelayAnnouncements } from "../src/experience";
 import { TICK_SECONDS } from "../src/levels";
 import type { Direction, GameState, Ghost, Phase } from "../src/types";
 
@@ -278,5 +278,35 @@ describe("presentation purity", () => {
     }
     expect(energizers).toBeGreaterThan(0);
     expect(poweredReads).toBeGreaterThan(30);
+  });
+});
+
+
+describe("relay presentation and announcements", () => {
+  it("exposes objective direction and protection without mutating the simulation", () => {
+    const game = new Game({ seed: 1, relay: true }); game.start(); game.update(123 * TICK_SECONDS);
+    const r = game.state.relay!;
+    r.deadline = game.state.frame + 100; r.ward = true; r.streak = 19;
+    const before = structuredClone(game.state);
+    expect(relayCue(game.state)?.label).toContain("Next beacon: upper right");
+    expect(relayCue(game.state)?.label).toContain("Ward ready: absorbs one hit");
+    expect(relayCue(game.state)?.label).toContain("Dot flow 19");
+    expect(game.state).toEqual(before);
+  });
+  it("announces new messages once, stays quiet on countdown updates, and respects pause", () => {
+    const game = new Game({ seed: 1, relay: true }); game.start(); game.update(123 * TICK_SECONDS);
+    const announcements = new RelayAnnouncements();
+    expect(announcements.next(game.state)).toContain("FOLLOW THE NUMBERED BEACON");
+    for (let i = 0; i < 30; i++) { game.state.frame++; expect(announcements.next(game.state)).toBeNull(); }
+    Object.assign(game.state.relay!, { message: "WARD ABSORBED A HIT", messageUntil: game.state.frame + 120, graceUntil: game.state.frame + 90 });
+    game.state.paused = true; expect(announcements.next(game.state)).toBeNull();
+    game.state.paused = false;
+    expect(announcements.next(game.state)).toContain("brief escape protection active");
+    expect(announcements.next(game.state)).toBeNull();
+    Object.assign(game.state.relay!, { message: "RELAY EXPIRED · TRY AGAIN", messageUntil: game.state.frame + 100 });
+    expect(announcements.next(game.state)).toContain("RELAY EXPIRED");
+    game.state.frame += 101;
+    expect(relayCue(game.state)?.message).toBe("");
+    expect(announcements.next(game.state)).toBeNull();
   });
 });

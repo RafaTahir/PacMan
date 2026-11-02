@@ -32,7 +32,7 @@ export class PacmanAdapter {
     this.iframe = document.createElement("iframe");
     this.iframe.id = "pacman-frame";
     this.iframe.src = "/pacman.html?arcade=1";
-    this.iframe.title = "Pac-Man — original arcade game";
+    this.iframe.title = "Pac-Man — Circuit Relay";
     this.iframe.allow = "autoplay; fullscreen";
     this.iframe.allowFullscreen = true;
     this.iframe.style.cssText = "width:100%;height:100%;border:0;display:block;min-height:0;";
@@ -41,13 +41,13 @@ export class PacmanAdapter {
     document.addEventListener("visibilitychange", this.background);
     this.iframe.addEventListener("load", this.loaded);
     this.mount.append(this.iframe);
-    this.callbacks.overlay("loading", "PAC-MAN", "Opening the original cabinet…");
+    this.callbacks.overlay("loading", "PAC-MAN", "Opening Circuit Relay…");
     this.timeout = window.setTimeout(() => {
       if (this.ready || this.phase === "disposed") return;
       this.phase = "unavailable";
       this.resolveWaiters(false);
       this.callbacks.notice("Pac-Man did not finish loading. Return to the arcade and try again.");
-      this.callbacks.overlay("unavailable", "Cabinet unavailable.", "The original game did not answer in time. Return to the arcade and try again.");
+      this.callbacks.overlay("unavailable", "Cabinet unavailable.", "The cabinet did not answer in time. Return to the arcade and try again.");
     }, 10_000);
   }
 
@@ -62,13 +62,13 @@ export class PacmanAdapter {
     this.lastMode = mode;
     this.ranked = null;
     this.delivered = false;
-    this.callbacks.overlay("preparing", "PAC-MAN", mode === "ranked" ? "Requesting your two-minute global challenge…" : "Opening classic local play…");
+    this.callbacks.overlay("preparing", "PAC-MAN", mode === "ranked" ? "Requesting your two-minute global challenge…" : "Opening local Circuit Relay…");
     if (!await this.whenReady() || revision !== this.revision || this.isDisposed()) return;
     if (mode === "ranked") {
       try { this.ranked = await issueRun("pacman"); }
       catch (error) {
         if (revision !== this.revision || this.isDisposed()) return;
-        this.callbacks.notice(`${error instanceof Error ? error.message : "The global challenge could not start."} Classic local play is available; this run will not enter the global board.`);
+        this.callbacks.notice(`${error instanceof Error ? error.message : "The global challenge could not start."} Local Circuit Relay is available; this run will not enter the global board.`);
       }
     }
     if (revision !== this.revision || this.isDisposed()) return;
