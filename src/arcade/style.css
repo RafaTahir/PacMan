@@ -81,3 +81,5 @@ body.play-controls-flippers .touch-nudge{display:flex;order:3;flex-basis:100%}
 .touch-nudge button.held{background:#536645;transform:translateY(2px)}
 @media(orientation:landscape) and (max-height:550px) and (pointer:coarse){body.play-controls-flippers .touch-nudge{width:100%;gap:6px}body.play-controls-flippers .touch-nudge button{flex:1;min-width:0;min-height:44px;padding:4px;font-size:8px}}
 @media(orientation:landscape) and (max-height:550px) and (pointer:coarse){body.play-controls-flippers .touch-controls{justify-content:center;padding:2px 8px}body.play-controls-flippers .touch-action-zone{gap:2px}body.play-controls-flippers .touch-action{height:44px;min-height:44px}body.play-controls-flippers .touch-nudge{flex-basis:auto}}
+
+.leaderboard-era{margin-top:12px}

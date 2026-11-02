@@ -101,7 +101,7 @@ function completed(game: GameId, seed: number, input: ArcadeInput = { ...NEUTRAL
   let frames = 0;
   let score = 0;
   if (game === "pacman") {
-    const simulation = new Game({ seed });
+    const simulation = new Game({ seed, relay: true });
     simulation.start();
     if (input.x < 0) simulation.input("left");
     else if (input.x > 0) simulation.input("right");
@@ -412,7 +412,7 @@ describe("persistent D1 leaderboards", () => {
     clock += 10_001;
     expect(await bodyOf(await request("/api/health"))).toMatchObject({ ok: true, database: "connected", cached: false });
   });
-  it("bounds rank and expiry cleanup independently of ten thousand permanent accepted fixtures", async () => {
+  it("keeps expiry cleanup bounded and ranks current scores separately from ten thousand historical fixtures", async () => {
     // Explicit isolated test fixtures, never production/demo competitors.
     db.sqlite.exec("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i < 10000) INSERT INTO runs (id,game,ruleset,seed,issued_at,expires_at,status) SELECT 'fixture-'||i,'reactor-breaker','after-hours-v1',1,0,1,'accepted' FROM n");
     db.sqlite.exec("INSERT INTO scores (run_id,game,ruleset,initials,score,frames,finished_at,finished_day,replay_hash) SELECT id,game,ruleset,'TST',1000,7200,1,'2026-01-01','fixture-hash' FROM runs");
@@ -426,11 +426,11 @@ describe("persistent D1 leaderboards", () => {
     const run = await start("reactor-breaker");
     const response = await finish(run);
     expect(response.status).toBe(200);
-    expect((await bodyOf(response)).entry.rank).toBeNull();
+    expect((await bodyOf(response)).entry.rank).toBe(1);
     const rankSql = db.statements.find((sql) => sql.startsWith("SELECT run_id FROM scores"))!;
     expect(rankSql).toContain("LIMIT 100");
     expect(rankSql).not.toContain("COUNT");
-    expect(JSON.stringify(db.sqlite.prepare(`EXPLAIN QUERY PLAN ${rankSql}`).all("reactor-breaker"))).toContain("scores_all_time_idx");
+    expect(JSON.stringify(db.sqlite.prepare(`EXPLAIN QUERY PLAN ${rankSql}`).all("reactor-breaker", RULESET_VERSION))).toContain("scores_all_time_idx");
     const board = await bodyOf(await request("/api/leaderboards?game=reactor-breaker&limit=100"));
     expect(board.entries).toHaveLength(100);
     expect(board.entries[99].rank).toBe(100);
@@ -474,7 +474,7 @@ describe("replay and API input boundaries", () => {
     expect(validateInitials("JEW")).toBe("JEW");
   });
   it.each([
-    "game=unknown", "game=pacman%27%3BDROP%20TABLE%20scores", "game=pacman&limit=-1", "game=pacman&limit=0", "game=pacman&limit=101", "game=pacman&limit=2.2", "game=pacman&limit=1e2", "game=pacman&scope=week", "game=pacman&scope=", "game=pacman&period=all", "game=pacman&scope=daily&day=2026-02-30", "game=pacman&scope=daily&day=2027-01-01", "game=pacman&day=2026-10-24", "game=pacman&game=chrome-siege", "scope=all",
+    "game=unknown", "game=pacman%27%3BDROP%20TABLE%20scores", "game=pacman&limit=-1", "game=pacman&limit=0", "game=pacman&limit=101", "game=pacman&limit=2.2", "game=pacman&limit=1e2", "game=pacman&scope=week", "game=pacman&scope=", "game=pacman&period=all", "game=pacman&ruleset=unknown", "game=pacman&ruleset=after-hours-v2&ruleset=after-hours-v3", "game=pacman&scope=daily&day=2026-02-30", "game=pacman&scope=daily&day=2027-01-01", "game=pacman&day=2026-10-24", "game=pacman&game=chrome-siege", "scope=all",
   ])("rejects invalid query %s", async (query) => { expect((await request(`/api/leaderboards?${query}`)).status).toBe(400); });
   it("rejects cross-origin reads and writes with no permissive CORS", async () => {
     for (const path of ["/api/leaderboards?game=pacman", "/api/health"]) {
@@ -565,6 +565,55 @@ describe("additive ten-cabinet storage", () => {
     expect(result.status).toBe(409);
     expect(await bodyOf(result)).toMatchObject({ error: { code: "ruleset_mismatch" } });
     expect(db.sqlite.prepare("SELECT status FROM runs WHERE id = ?").get(run.runId)?.status).toBe("issued");
+  });
+});
+
+describe("v3 ruleset transition without schema changes", () => {
+  it.each(["pacman", "hollow-bureau"] as const)("leaves an in-flight v2 %s ticket unchanged and requests a reload", async (game) => {
+    const run = await start(game);
+    const table = isAdditionalCabinet(game) ? "cabinet_runs" : "runs";
+    db.sqlite.prepare(`UPDATE ${table} SET ruleset = 'after-hours-v2' WHERE id = ?`).run(run.runId);
+    const before = db.sqlite.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(run.runId);
+    const response = await request(`/api/runs/${run.runId}/finish`, { initials: "TST", frames: 1, inputs: [], score: 999999 });
+    expect(response.status).toBe(409);
+    const body = await bodyOf(response);
+    expect(body.error.code).toBe("ruleset_mismatch");
+    expect(body.error.message).toContain("Reload");
+    expect(db.sqlite.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(run.runId)).toEqual(before);
+    expect((await request("/api/runs", { game, ruleset: "after-hours-v2" })).status).toBe(409);
+  });
+
+  it.each(["pacman", "hollow-bureau"] as const)("recovers an accepted v2 %s score by its persisted digest and separates current/history boards", async (game) => {
+    // Explicit isolated fixtures represent an acceptance before deployment, not
+    // a new replay to be trusted or simulated under changed v3 game mechanics.
+    const run = await start(game);
+    const runs = isAdditionalCabinet(game) ? "cabinet_runs" : "runs";
+    const scores = isAdditionalCabinet(game) ? "cabinet_scores" : "scores";
+    const legacyRules = "after-hours-v2";
+    const prior = { initials: "TST", frames: 1, inputs: [], score: 290 };
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ ruleset: legacyRules, game, seed: run.seed, frames: prior.frames, inputs: prior.inputs })));
+    const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    db.sqlite.prepare(`UPDATE ${runs} SET ruleset = ?, status = 'accepted' WHERE id = ?`).run(legacyRules, run.runId);
+    db.sqlite.prepare(`INSERT INTO ${scores} (run_id, game, ruleset, initials, score, frames, finished_at, finished_day, replay_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(run.runId, game, legacyRules, prior.initials, prior.score, prior.frames, clock, "2026-10-25", hash);
+    const before = db.sqlite.prepare(`SELECT * FROM ${scores} WHERE run_id = ?`).get(run.runId);
+    clock += 21 * 60 * 1000; // An already accepted result remains recoverable after ticket expiry.
+    const response = await request(`/api/runs/${run.runId}/finish`, prior);
+    expect(response.status).toBe(200);
+    expect(await bodyOf(response)).toMatchObject({ accepted: true, replayed: true, score: 290, entry: { ruleset: legacyRules, rank: 1 } });
+    expect((await request(`/api/runs/${run.runId}/finish`, { ...prior, score: 291 })).status).toBe(409);
+    expect((await request(`/api/runs/${run.runId}/finish`, { ...prior, inputs: [[0, 127, 0, 0, 0, 0]] })).status).toBe(409);
+    const current = await bodyOf(await request(`/api/leaderboards?game=${game}&ruleset=${RULESET_VERSION}`));
+    const historical = await bodyOf(await request(`/api/leaderboards?game=${game}&ruleset=${legacyRules}`));
+    const archive = await bodyOf(await request(`/api/leaderboards?game=${game}`));
+    const daily = await bodyOf(await request(`/api/leaderboards?game=${game}&scope=daily&ruleset=${legacyRules}`));
+    expect(current).toMatchObject({ ruleset: RULESET_VERSION, entries: [] });
+    expect(historical).toMatchObject({ ruleset: legacyRules, entries: [{ runId: run.runId, score: 290, ruleset: legacyRules }] });
+    expect(daily.entries).toEqual(historical.entries);
+    expect(archive).toMatchObject({ ruleset: "all", entries: historical.entries });
+    // Cached current and historical boards cannot leak entries across eras.
+    expect((await bodyOf(await request(`/api/leaderboards?game=${game}&ruleset=${RULESET_VERSION}`))).entries).toEqual([]);
+    expect(db.sqlite.prepare(`SELECT * FROM ${scores} WHERE run_id = ?`).get(run.runId)).toEqual(before);
+    expect(db.sqlite.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 });
 

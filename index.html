@@ -53,14 +53,15 @@
             <h2 id="leaderboard-title">The high<br />score club<span>.</span></h2>
             <p class="leaderboard-intro">Real players. Real scores. Your initials next?</p>
             <div class="leaderboard-filters">
-              <label class="field-label" for="leaderboard-game">CABINET<select id="leaderboard-game"><option value="pacman">PAC-MAN</option><option value="neon-rally">Neon Rally</option><option value="reactor-breaker">Reactor Breaker</option><option value="chrome-siege">Chrome Siege</option><option value="midnight-pinball">Midnight Pinball</option><option value="orbit-salvage">Orbit Salvage</option><option value="tidal-courier">Tidal Courier</option><option value="prism-circuit">Prism Circuit</option><option value="skybound-stack">Skybound Stack</option><option value="canopy-sprint">Canopy Sprint</option></select></label>
+              <label class="field-label" for="leaderboard-game">CABINET<select id="leaderboard-game"><option value="pacman">PAC-MAN</option><option value="neon-rally">Neon Rally</option><option value="reactor-breaker">Reactor Breaker</option><option value="chrome-siege">Chrome Siege</option><option value="midnight-pinball">Midnight Pinball</option><option value="orbit-salvage">Orbit Salvage</option><option value="tidal-courier">Tidal Courier</option><option value="prism-circuit">Prism Circuit</option><option value="skybound-stack">Skybound Stack</option><option value="canopy-sprint">Canopy Sprint</option><option value="hollow-bureau">Hollow Bureau</option></select></label>
               <label class="field-label board-scope" for="leaderboard-scope">BOARD<select id="leaderboard-scope"><option value="all" selected>All time</option><option value="daily">Today (UTC)</option></select></label>
               <button id="leaderboard-refresh" class="icon-button refresh-button" type="button" aria-label="Refresh global leaderboard" title="Refresh leaderboard"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16.5 8A6.6 6.6 0 1 0 16 14M16.5 3v5h-5"/></svg></button>
             </div>
+            <label class="field-label leaderboard-era" for="leaderboard-ruleset">RULES<select id="leaderboard-ruleset"><option value="after-hours-v3" selected>Current · v3</option><option value="after-hours-v2">Previous · v2</option><option value="after-hours-v1">Original · v1</option><option value="all">Full archive · mixed rules</option></select></label>
             <p id="leaderboard-state" class="leaderboard-state" role="status">Connecting to the global leaderboard…</p>
             <div class="leaderboard-table-wrap"><table class="leaderboard-table" aria-label="Global high scores"><thead><tr><th scope="col">RANK</th><th scope="col">INITIALS</th><th scope="col">SCORE</th></tr></thead><tbody id="leaderboard-body"></tbody></table></div>
             <div class="leaderboard-bottom"><span id="leaderboard-updated">GLOBAL · ALL TIME</span><span class="board-seal" aria-hidden="true">AH<br />AC</span></div>
-            <p class="leaderboard-note">All eleven games are free to play. Post a verified score with any three-letter initials.</p>
+            <p class="leaderboard-note">Scores compete within their own rules. Every previous score remains in the archive; scores from different rules are not directly comparable.</p>
           </aside>
         </div>
 
@@ -74,7 +75,7 @@
         <figure class="lineup-banner"><img src="/arcade-lineup.webp" width="2400" height="760" style="max-width:100%;height:auto" loading="lazy" decoding="async" alt="Eleven neon arcade cabinets in a curved row on a glowing grid floor, each lit in its own game colour." /></figure>
 
         <section id="cabinets" class="library-section" aria-labelledby="library-title">
-          <div class="section-heading"><div><p class="eyebrow">PICK YOUR KIND OF TROUBLE</p><h2 id="library-title">Meet the cabinets<span class="heading-dot">.</span></h2></div><p class="library-note"><span>10 GAMES</span>KEYBOARD + TOUCH</p></div>
+          <div class="section-heading"><div><p class="eyebrow">PICK YOUR KIND OF TROUBLE</p><h2 id="library-title">Meet the cabinets<span class="heading-dot">.</span></h2></div><p class="library-note"><span>11 GAMES</span>KEYBOARD + TOUCH</p></div>
           <div id="cabinet-grid" class="cabinet-grid">
             <button class="cabinet-card" data-game="pacman" type="button" style="--game-accent:#ffe36c" aria-label="Play PAC-MAN, the original chase">
               <span class="card-topline"><span>01 / THE ORIGINAL CHASE</span><span class="card-launch" aria-hidden="true"><svg class="arrow-svg" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 16 16 4M4 4h12v12"/></svg></span></span>

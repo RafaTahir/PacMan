@@ -20,9 +20,9 @@ const healthCache = new WeakMap<D1Database, { checkedAt: number; connected: bool
 
 type JsonObject = Record<string, unknown>;
 interface RunRow { id: string; game: GameId; ruleset: string; seed: number; issued_at: number; expires_at: number; status: string; claim_token: string | null; claim_expires_at: number | null }
-interface ScoreRow { run_id: string; initials: string; score: number; finished_at: number }
+interface ScoreRow { run_id: string; initials: string; score: number; finished_at: number; ruleset: string }
 interface AcceptedScoreRow extends ScoreRow { frames: number; replay_hash: string }
-export interface LeaderboardEntry { rank: number | null; initials: string; score: number; runId: string; finishedAt: string; verified: true }
+export interface LeaderboardEntry { rank: number | null; initials: string; score: number; runId: string; finishedAt: string; verified: true; ruleset: string }
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 const shouldSweep = (): boolean => (crypto.getRandomValues(new Uint8Array(1))[0] & 31) === 0;
@@ -125,7 +125,7 @@ async function rateLimit(request: Request, db: D1Database, env: Env, action: "st
   if (!result.results?.length) deny();
 }
 function serializeEntry(row: ScoreRow, rank: number | null): LeaderboardEntry {
-  return { rank, initials: row.initials, score: row.score, runId: row.run_id, finishedAt: new Date(row.finished_at).toISOString(), verified: true };
+  return { rank, initials: row.initials, score: row.score, runId: row.run_id, finishedAt: new Date(row.finished_at).toISOString(), verified: true, ruleset: row.ruleset };
 }
 function method(request: Request, expected: string): void {
   if (request.method !== expected) throw new ApiError(405, "method_not_allowed", `Use ${expected} for this endpoint.`);
@@ -141,10 +141,15 @@ function boardCache(db: D1Database): Map<string, CachedBoard> {
 async function leaderboard(request: Request, url: URL, db: D1Database, env: Env, now: number): Promise<Response> {
   method(request, "GET");
   for (const name of url.searchParams.keys()) {
-    if (!["game", "scope", "limit", "day"].includes(name) || url.searchParams.getAll(name).length !== 1)
+    if (!["game", "scope", "limit", "day", "ruleset"].includes(name) || url.searchParams.getAll(name).length !== 1)
       throw new ApiError(400, "invalid_query", "Unsupported or repeated leaderboard query parameter.");
   }
   const game = gameId(url.searchParams.get("game"));
+  // Omitted filter preserves the original archive API. Current clients explicitly
+  // select their ruleset so changed scoring is never silently ranked together.
+  const ruleset = url.searchParams.get("ruleset") ?? "all";
+  if (!["all", "after-hours-v1", "after-hours-v2", RULESET_VERSION].includes(ruleset))
+    throw new ApiError(400, "invalid_ruleset", "Choose the current ruleset or a historical board.");
   const scope = url.searchParams.get("scope") ?? "all";
   if (scope !== "all" && scope !== "daily") throw new ApiError(400, "invalid_scope", "scope must be all or daily.");
   const limitText = url.searchParams.get("limit") ?? "20";
@@ -157,16 +162,16 @@ async function leaderboard(request: Request, url: URL, db: D1Database, env: Env,
   // Identical boards are served from a short-lived isolate cache: repeated polls
   // cost no D1 reads or rate-limit writes.
   const cache = boardCache(db);
-  const cacheKey = `${game}|${scope}|${day}|${limitText}`;
+  const cacheKey = `${game}|${scope}|${day}|${limitText}|${ruleset}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > now) return new Response(cached.body, { status: 200, headers: JSON_HEADERS });
   await rateLimit(request, db, env, "board", now);
   const store = storeForGame(game);
-  const query = scope === "daily"
-    ? db.prepare(`SELECT run_id, initials, score, finished_at FROM ${store.scores} WHERE game = ? AND finished_day = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?`).bind(game, day, Number(limitText))
-    : db.prepare(`SELECT run_id, initials, score, finished_at FROM ${store.scores} WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?`).bind(game, Number(limitText));
+  const where = `game = ?${scope === "daily" ? " AND finished_day = ?" : ""}${ruleset === "all" ? "" : " AND ruleset = ?"}`;
+  const values = [game, ...(scope === "daily" ? [day] : []), ...(ruleset === "all" ? [] : [ruleset]), Number(limitText)];
+  const query = db.prepare(`SELECT run_id, initials, score, finished_at, ruleset FROM ${store.scores} WHERE ${where} ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT ?`).bind(...values);
   const rows = successful(await query.all<ScoreRow>()).results ?? [];
-  const body = JSON.stringify({ game, scope, ...(scope === "daily" ? { day } : {}), entries: rows.map((row, index) => serializeEntry(row, index + 1)), updatedAt: new Date(now).toISOString() });
+  const body = JSON.stringify({ game, scope, ruleset, ...(scope === "daily" ? { day } : {}), entries: rows.map((row, index) => serializeEntry(row, index + 1)), updatedAt: new Date(now).toISOString() });
   if (!cache.has(cacheKey) && cache.size >= BOARD_CACHE_ENTRIES) cache.delete(cache.keys().next().value!);
   cache.set(cacheKey, { expiresAt: now + BOARD_CACHE_SECONDS * 1000, body });
   if (shouldSweep()) await pruneExpired(db, now).catch(() => {});
@@ -213,11 +218,11 @@ export async function sweepExpired(db: D1Database, now: number, maxBatches = 20)
   return total;
 }
 async function acceptedRow(db: D1Database, store: Store, runId: string): Promise<AcceptedScoreRow | null> {
-  return db.prepare(`SELECT run_id, initials, score, frames, finished_at, replay_hash FROM ${store.scores} WHERE run_id = ?`).bind(runId).first<AcceptedScoreRow>();
+  return db.prepare(`SELECT run_id, initials, score, frames, finished_at, replay_hash, ruleset FROM ${store.scores} WHERE run_id = ?`).bind(runId).first<AcceptedScoreRow>();
 }
-async function boundedRank(db: D1Database, store: Store, game: GameId, runId: string): Promise<number | null> {
+async function boundedRank(db: D1Database, store: Store, game: GameId, ruleset: string, runId: string): Promise<number | null> {
   try {
-    const rows = successful(await db.prepare(`SELECT run_id FROM ${store.scores} WHERE game = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT 100`).bind(game).all<{ run_id: string }>()).results ?? [];
+    const rows = successful(await db.prepare(`SELECT run_id FROM ${store.scores} WHERE game = ? AND ruleset = ? ORDER BY score DESC, finished_at ASC, run_id ASC LIMIT 100`).bind(game, ruleset).all<{ run_id: string }>()).results ?? [];
     const position = rows.findIndex((row) => row.run_id === runId);
     return position < 0 ? null : position + 1;
   } catch {
@@ -235,7 +240,7 @@ async function recoveredResponse(db: D1Database, store: Store, run: RunRow, body
   const replayHash = await replayDigest(run, replay.frames, replay.inputs);
   if (initials !== row.initials || replay.frames !== row.frames || replayHash !== row.replay_hash || (body.score !== undefined && body.score !== row.score))
     throw new ApiError(409, "run_already_submitted", "This run was already accepted with a different submission.");
-  return json({ accepted: true, entry: serializeEntry(row, await boundedRank(db, store, run.game, run.id)), score: row.score, verified: true, replayed: true });
+  return json({ accepted: true, entry: serializeEntry(row, await boundedRank(db, store, run.game, run.ruleset, run.id)), score: row.score, verified: true, replayed: true });
 }
 async function releaseClaim(db: D1Database, store: Store, runId: string, token: string): Promise<void> {
   await execute(db.prepare(`UPDATE ${store.runs} SET status = 'issued', claim_token = NULL, claim_expires_at = NULL WHERE id = ? AND status = 'verifying' AND claim_token = ? AND NOT EXISTS (SELECT 1 FROM ${store.scores} WHERE ${store.scores}.run_id = ${store.runs}.id)`).bind(runId, token));
@@ -262,7 +267,7 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
   }
   if (run.status === "rejected") throw new ApiError(409, "run_already_submitted", "This run has already been rejected.");
   if (now >= run.expires_at) throw new ApiError(410, "run_expired", "This ranked run has expired. Start a new game.");
-  if (run.ruleset !== RULESET_VERSION) throw new ApiError(409, "ruleset_mismatch", "This run uses an older ruleset. Start a new game.");
+  if (run.ruleset !== RULESET_VERSION) throw new ApiError(409, "ruleset_mismatch", "This run started before the arcade upgrade and cannot be ranked under the new rules. Your local best is safe. Reload the arcade and start a new ranked run.");
   // Guest labels may be corrected without consuming the replay ticket.
   const initials = validateInitials(body.initials);
   const { tickRate } = runLimits(run.game);
@@ -322,7 +327,7 @@ async function finishRun(request: Request, runId: string, db: D1Database, env: E
     if (row) return recoveredResponse(db, store, run, body, row);
     throw error;
   }
-  return json({ accepted: true, entry: serializeEntry({ run_id: runId, initials, score, finished_at: finishedAt }, await boundedRank(db, store, run.game, runId)), score, verified: true });
+  return json({ accepted: true, entry: serializeEntry({ run_id: runId, initials, score, finished_at: finishedAt, ruleset: run.ruleset }, await boundedRank(db, store, run.game, run.ruleset, runId)), score, verified: true });
 }
 
 // The game is fully self-hosted: no third-party scripts, styles, fonts or frames.
