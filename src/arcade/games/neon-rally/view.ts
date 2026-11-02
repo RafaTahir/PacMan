@@ -47,6 +47,9 @@ export class RallyView implements ArcadeView {
   private readonly textures = new Set<THREE.Texture>();
   private readonly previousBackground: THREE.Color | THREE.Texture | THREE.CubeTexture | null;
   private readonly previousFog: THREE.Fog | THREE.FogExp2 | null;
+  private readonly districtStructures: THREE.Group[] = [];
+  private readonly routeGate = new THREE.Group();
+  private readonly draftRibbon: THREE.Mesh;
   private readonly dummy = new THREE.Object3D();
   private readonly matrix = new THREE.Matrix4();
   private readonly local = new THREE.Object3D();
@@ -233,6 +236,37 @@ export class RallyView implements ArcadeView {
     this.banner.renderOrder = 10;
     this.root.add(this.banner);
 
+    for(let district=0;district<4;district++) {
+      const group=new THREE.Group();this.root.add(group);this.districtStructures.push(group);
+      const steel=this.material(new THREE.MeshStandardMaterial({color:0x344c66,metalness:.65,roughness:.4}));
+      const light=this.material(new THREE.MeshBasicMaterial({color:[0x53e5e2,0xb5b2ff,0xffcb85,0x80fff0][district]}));
+      for(const side of [-1,1])for(let i=0;i<4;i++){
+        const x=side*(district===1?12:10),z=-i*23;
+        const height=district===1?15:district===3?12:district===2?3:6;
+        this.mesh(this.box,steel,x,height/2,z,.65,height,.8,group);
+        this.mesh(this.box,light,x-side*.36,height/2,z,.055,height*.8,.5,group);
+        if(district===3){
+          this.mesh(this.box,steel,0,12,z,20,.35,.4,group);
+          for(let j=0;j<5;j++)this.mesh(this.box,light,x-side*j*1.6,6+j*.85,z,.045,12-j*1.7,.045,group);
+        }else if(district===1)this.mesh(this.box,steel,x+side*2,height*.8,z,4,.3,2,group);
+        else if(district===0)this.mesh(this.box,steel,x-side*1.4,5.5,z,3.2,.3,.5,group);
+        else this.mesh(this.geometry(new THREE.ConeGeometry(1.9,4,7)),steel,x+side,3,z,1,1,1,group);
+      }
+    }
+    this.root.add(this.routeGate);
+    for(const side of [-1,1]) {
+      const mat=this.material(new THREE.MeshBasicMaterial({color:side<0?0xffcb77:0x62eaff}));
+      this.mesh(this.box,mat,side*7.1,2.2,0,.18,4.4,.2,this.routeGate);
+      this.mesh(this.box,mat,side*3.6,4.4,0,7,.18,.2,this.routeGate);
+      for(let i=0;i<3;i++) this.mesh(this.box,mat,side*3.6,.05,i*2-4,.14,.03,1.2,this.routeGate).rotation.y=side*.5;
+    }
+    const signs=document.createElement("canvas");signs.width=768;signs.height=96;
+    const label=signs.getContext("2d")!;label.fillStyle="#081521";label.fillRect(0,0,768,96);
+    label.textAlign="center";label.font="bold 27px monospace";label.fillStyle="#ffcb77";label.fillText("← BANK 300 DRIFT",192,55);
+    label.fillStyle="#62eaff";label.fillText("5 CLEAN PASSES →",576,55);
+    this.mesh(this.geometry(new THREE.PlaneGeometry(13,1.6)),this.material(new THREE.MeshBasicMaterial({map:this.texture(new THREE.CanvasTexture(signs)),side:THREE.DoubleSide})),0,3.5,.1,1,1,1,this.routeGate).rotation.x=-.5;
+    this.draftRibbon=this.mesh(this.geometry(new THREE.PlaneGeometry(1,1)),this.material(new THREE.MeshBasicMaterial({color:0x9cfff3,transparent:true,opacity:.3,side:THREE.DoubleSide,depthWrite:false})),0,.03,0,1,1,1);
+    this.draftRibbon.rotation.x=-Math.PI/2;
     this.resize(stage.width, stage.height);
     this.update(1, { reducedMotion: false, highContrast: false });
   }
@@ -240,6 +274,12 @@ export class RallyView implements ArcadeView {
   update(alpha: number, options: VisualOptions): void {
     if (this.disposed) return;
     const state = this.simulation.state;
+    this.districtStructures.forEach((group,i)=>{group.visible=i===state.district;});
+    this.routeGate.visible=state.gateDistance!==null;
+    this.routeGate.position.z=-(state.gateDistance??90);
+    const draft=state.entities.find(e=>e.id===state.draftId);
+    this.draftRibbon.visible=!!draft;
+    if(draft){this.draftRibbon.position.set(draft.x,.04,-Math.max(0,draft.distance)/2);this.draftRibbon.scale.set(state.draftTicks>=45?1.4:.7,Math.max(1,draft.distance),1);}
     const fraction = clamp(alpha, 0, 1);
     const distance = lerp(state.previousDistance, state.distance, fraction);
     const playerX = lerp(state.player.previousX, state.player.x, fraction);
@@ -316,7 +356,7 @@ export class RallyView implements ArcadeView {
       this.banner.position.set(playerX * 0.22, 1.1, 5.8);
       (this.banner.material as THREE.SpriteMaterial).opacity = options.reducedMotion ? 1 : Math.min(1, callout.ticks / 15);
     }
-    const boosted = state.player.boosting && !options.reducedMotion;
+    const boosted = (state.player.boosting || state.slingshotTicks>0) && !options.reducedMotion;
     this.streaks.visible = boosted;
     if (boosted) {
       for (let index = 0; index < 20; index++) {
@@ -538,7 +578,7 @@ export class RallyView implements ArcadeView {
     context.fillText(label + (value > 0 && label !== "CAR LOST" ? `  +${value}` : ""), 320, 52);
     context.fillStyle = "#8ba8c9";
     context.font = "500 18px monospace";
-    const subtitle = label === "NEAR MISS" || label === "DANGEROUS" ? "CLOSE PASS · NITRO REFILLED" : label === "DRIFT BANKED" ? "CONTROL THE SLIDE · BUILD THE CHAIN" : label === "CHECKPOINT" ? "ARMOR +18 · NITRO +22" : label === "REPAIRED" ? "ARMOR +22 · NITRO +35" : label === "CAR LOST" ? `${value} ${value === 1 ? "CAR" : "CARS"} REMAINING · KEEP GOING` : label === "NITRO" ? "MORE SPEED · MORE RISK" : label === "OIL SLICK" ? "EASE THE STEERING" : "THE CITY IS YOURS";
+    const subtitle = label === "SLIPSTREAM READY" ? "PASS THE MARKED CAR IN 4 SECONDS" : label === "SLINGSHOT" ? "CLEAN PASS · SPEED +7 · NITRO +18" : label === "CONTRACT COMPLETE" ? "DELIVERED · ARMOR +10" : label === "CONTRACT MISSED" ? "NEXT GATE · ANOTHER CHANCE" : label === "NEAR MISS" || label === "DANGEROUS" ? "CLOSE PASS · NITRO REFILLED" : label === "DRIFT BANKED" ? "CONTROL THE SLIDE · BUILD THE CHAIN" : label === "CHECKPOINT" ? "ARMOR +18 · NITRO +22" : label === "REPAIRED" ? "ARMOR +22 · NITRO +35" : label === "CAR LOST" ? `${value} ${value === 1 ? "CAR" : "CARS"} REMAINING · KEEP GOING` : label === "NITRO" ? "MORE SPEED · MORE RISK" : label === "OIL SLICK" ? "EASE THE STEERING" : "THE CITY IS YOURS";
     context.fillText(subtitle, 320, 85);
     this.bannerTexture.needsUpdate = true;
   }

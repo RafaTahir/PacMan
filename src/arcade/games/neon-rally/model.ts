@@ -13,7 +13,7 @@ export const DISTRICT_NAMES = ["LOWER GRID", "GLASS QUARTER", "AFTERLIGHT", "FIN
 
 export type EntityKind = "sedan" | "taxi" | "van" | "truck" | "bike" | "barrier" | "cone" | "oil" | "cell";
 export type EffectKind = "spark" | "drift" | "boost" | "near" | "repair" | "checkpoint";
-export type RallyCallout = "NEAR MISS" | "DANGEROUS" | "DRIFT BANKED" | "NITRO" | "REPAIRED" | "CHECKPOINT" | "CAR LOST" | "OIL SLICK" | "FINISH";
+export type RallyCallout = "NEAR MISS" | "DANGEROUS" | "DRIFT BANKED" | "NITRO" | "REPAIRED" | "CHECKPOINT" | "CAR LOST" | "OIL SLICK" | "FINISH" | "SLIPSTREAM READY" | "SLINGSHOT" | "CONTRACT COMPLETE" | "CONTRACT MISSED";
 
 export interface RallyEntity {
   id: number;
@@ -62,6 +62,10 @@ export interface RallyPlayer {
 }
 
 export interface RallyState extends ArcadeState {
+  draftId: number | null; draftTicks: number; draftUntil: number; slingshotTicks: number; slingshots: number;
+  gateDistance: number | null; nextGateTick: number;
+  contract: { kind: "drift" | "overtake"; baseline: number; deadline: number } | null;
+  contracts: number;
   rng: number;
   player: RallyPlayer;
   lives: number;
@@ -117,6 +121,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
 
   constructor(seed: number) {
     this.state = {
+      draftId: null, draftTicks: 0, draftUntil: 0, slingshotTicks: 0, slingshots: 0, gateDistance: null, nextGateTick: 360, contract: null, contracts: 0,
       seed: seed >>> 0, rng: seed >>> 0 || 1, tick: 0, score: 0, status: "playing",
       player: { x: 0, previousX: 0, velocityX: 0, heading: 0, speed: 26, health: 100, nitro: 65,
         boostLocked: false, boosting: false, drifting: false, driftCharge: 0, invulnerable: 0, oilTicks: 0, edgeCooldown: 0 },
@@ -147,6 +152,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
     }
     state.effects = state.effects.filter((effect) => effect.life > 0);
 
+    this.updateDraft(signals);
     this.movePlayer(input, signals);
     if (state.status !== "playing") return signals;
     state.distance += state.player.speed * DT;
@@ -173,6 +179,12 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
         entity.scored = true;
         if (isTraffic(entity.kind) && !entity.hit) {
           state.overtakes++;
+          if (entity.id === state.draftId && state.draftTicks >= 45 && state.tick <= state.draftUntil) {
+            state.slingshots++; state.slingshotTicks = 120; state.player.nitro = Math.min(100,state.player.nitro + 18);
+            this.addScore(400 * comboMultiplier(state.combo)); this.announce("SLINGSHOT",400 * comboMultiplier(state.combo),110);
+            this.effect("boost",state.player.x,0,70); signals.push({type:"boost",value:400});
+            state.draftId=null; state.draftTicks=0; state.draftUntil=0;
+          }
           this.addScore(25);
           if (entity.nearGap >= 0 && entity.nearGap < 0.95) this.nearMiss(entity.nearGap, signals);
         }
@@ -181,6 +193,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
     state.entities = state.entities.filter((entity) => entity.distance > -13);
 
     if (state.status !== "playing") return signals;
+    this.updateContract(signals);
     const district = Math.min(3, Math.floor(state.tick / 1800));
     if (district > state.district) {
       state.district = district;
@@ -209,6 +222,41 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
       signals.push({ type: "win", value: state.score });
     }
     return signals;
+  }
+
+  private updateDraft(signals: GameSignal[]): void {
+    const s=this.state;
+    s.slingshotTicks=Math.max(0,s.slingshotTicks-1);
+    if (s.draftTicks >= 45) {
+      if (s.tick > s.draftUntil || !s.entities.some(e=>e.id===s.draftId && !e.hit && !e.scored)) {
+        s.draftId=null;s.draftTicks=0;s.draftUntil=0;
+      }
+      return;
+    }
+    const target=s.entities.filter(e=>isTraffic(e.kind) && !e.hit && !e.scored && e.distance>6 && e.distance<19 && Math.abs(e.x-s.player.x)<.65)
+      .sort((a,b)=>a.distance-b.distance || a.id-b.id)[0];
+    if (!target || s.player.invulnerable>0) {s.draftId=null;s.draftTicks=0;return;}
+    s.draftTicks=target.id===s.draftId?s.draftTicks+1:1;s.draftId=target.id;
+    if(s.draftTicks===45){s.draftUntil=s.tick+240;this.announce("SLIPSTREAM READY",0,100);signals.push({type:"chain"});}
+  }
+
+  private updateContract(signals: GameSignal[]): void {
+    const s=this.state;
+    if(s.gateDistance===null && s.tick>=s.nextGateTick && !s.contract && s.tick<MAX_TICKS-1500) s.gateDistance=85;
+    if(s.gateDistance!==null){
+      s.gateDistance-=s.player.speed*DT;
+      if(s.gateDistance<=0){
+        const kind=s.player.x<0?"drift":"overtake";
+        s.contract={kind,baseline:kind==="drift"?s.driftScore:s.overtakes,deadline:s.tick+1200};
+        s.gateDistance=null;s.nextGateTick=s.tick+1500;
+      }
+    }
+    if(!s.contract)return;
+    const c=s.contract, progress=(c.kind==="drift"?s.driftScore:s.overtakes)-c.baseline;
+    if(progress >= (c.kind==="drift"?300:5)){
+      s.contracts++;this.addScore(1500);s.player.health=Math.min(100,s.player.health+10);
+      this.announce("CONTRACT COMPLETE",1500,150);signals.push({type:"upgrade",value:1500});s.contract=null;
+    }else if(s.tick>c.deadline){this.announce("CONTRACT MISSED",0,100);s.contract=null;}
   }
 
   private movePlayer(input: Readonly<ArcadeInput>, signals: GameSignal[]): void {
@@ -242,6 +290,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
     let targetSpeed = 33 + Math.min(6, state.tick / 1200) - throttle * (throttle > 0 ? 12 : 4);
     if (brake) targetSpeed -= 10;
     if (player.boosting) targetSpeed += 13;
+    if (state.slingshotTicks > 0) targetSpeed += 7;
     if (player.oilTicks > 0) targetSpeed -= 5;
     player.speed += (targetSpeed - player.speed) * (targetSpeed > player.speed ? 0.023 : 0.045);
     player.speed = clamp(player.speed, 9, 55);
@@ -307,6 +356,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
       player.driftCharge = 0;
       state.combo = 0;
       state.comboTicks = 0;
+      state.draftId=null; state.draftTicks=0; state.draftUntil=0; state.slingshotTicks=0;
       this.announce("OIL SLICK", 0, 90);
       this.effect("drift", player.x, 0, 45);
       signals.push({ type: "hit", value: 0 });
@@ -330,6 +380,7 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
     state.combo = 0;
     state.comboTicks = 0;
     state.collisions++;
+    state.draftId = null; state.draftTicks = 0; state.draftUntil = 0; state.slingshotTicks = 0;
     signals.push({ type: "hit", value: amount });
     if (player.health === 0) {
       state.lives--;

@@ -285,3 +285,39 @@ describe("Neon Rally ranked replays", () => {
     expect(signals).toContainEqual({ type: "win", value: MAX_SCORE });
   });
 });
+
+describe("Neon Rally slipstream and route contracts", () => {
+  it("charges only eligible traffic and pays once for passing the marked car", () => {
+    const sim=clearRoad(); const s=sim.state;
+    for(let i=0;i<45;i++) {s.entities=[makeEntity(300,"sedan",s.player.x,12,s.player.speed)];sim.step(input());}
+    expect(s.draftTicks).toBe(45);expect(s.draftId).toBe(300);
+    s.entities=[makeEntity(301,"sedan",4,-5)];sim.step(input());expect(s.slingshots).toBe(0);
+    // Re-arm a fresh target through ordinary drafting ticks.
+    for(let i=0;i<45;i++) {s.entities=[makeEntity(302,"sedan",s.player.x,12,s.player.speed)];sim.step(input());}
+    s.entities=[makeEntity(302,"sedan",4,-5)];const signals=sim.step(input());
+    expect(s.slingshots).toBe(1);expect(s.slingshotTicks).toBe(120);expect(signals.some(v=>v.type==='boost')).toBe(true);
+    sim.step(input());expect(s.slingshots).toBe(1);
+  });
+  it("does not draft pickups and cancels charge on damage or expiry", () => {
+    const sim=clearRoad();const s=sim.state;
+    for(let i=0;i<60;i++){s.entities=[makeEntity(300,'cell',0,12)];sim.step(input());}
+    expect(s.draftTicks).toBe(0);
+    s.draftTicks=45;s.draftId=1;s.draftUntil=s.tick+1;s.entities=[makeEntity(1,'sedan',0,12)];
+    tick(sim,2);expect(s.draftTicks).toBe(0);
+    s.draftTicks=44;s.draftId=2;s.entities=[makeEntity(2,'sedan',0,0)];sim.step(input());expect(s.draftId).toBeNull();
+  });
+  it("lets left/right choices select distinct contracts and settles each once", () => {
+    for(const x of [-3,3]){
+      const sim=clearRoad();const s=sim.state;s.player.x=x;s.gateDistance=.1;sim.step(input());
+      expect(s.contract?.kind).toBe(x<0?'drift':'overtake');
+      if(x<0)s.driftScore+=300;else s.overtakes+=5;
+      sim.step(input());expect(s.contracts).toBe(1);expect(s.contract).toBeNull();
+      sim.step(input());expect(s.contracts).toBe(1);
+    }
+  });
+  it("missed contracts cost no lives and a later gate remains available", () => {
+    const sim=clearRoad();const s=sim.state;s.contract={kind:'drift',baseline:0,deadline:0};sim.step(input());
+    expect(s.contract).toBeNull();expect(s.lives).toBe(3);expect(s.callout?.label).toBe('CONTRACT MISSED');
+    s.nextGateTick=s.tick;sim.step(input());expect(s.gateDistance).not.toBeNull();
+  });
+});
