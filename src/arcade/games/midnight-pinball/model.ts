@@ -9,7 +9,7 @@ export interface PinballBall {
   id: number; x: number; y: number; z: number; px: number; py: number; pz: number;
   vx: number; vy: number; vz: number; mode: BallMode;
   rampDistance: number; rampSpeed: number; contactCooldown: number;
-  skillTarget?:number; precisionLaunch?:boolean;
+  skillTarget?:number; precisionLaunch?:boolean; skillGuided?:boolean;
   launchedAt: number; skillShot: boolean; saveEligible: boolean;
 }
 export interface Flipper { x: number; y: number; length: number; angle: number; previousAngle: number; omega: number }
@@ -224,6 +224,12 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
     if (ball.mode === "air") {
       ball.vz -= 9.8 * dt; ball.z += ball.vz * dt;
       if (ball.z <= BALL_RADIUS) { ball.z = BALL_RADIUS; ball.vz = 0; ball.mode = "table"; }
+    }
+    // An authored mechanical launch diverter opens only for a precision plunge.
+    // It aims from the actual shooter-lane exit; subsequent contacts remain physical.
+    if(ball.skillShot && ball.precisionLaunch && !ball.skillGuided && ball.x>3.58 && ball.y< -4.8 && ball.vy<0){
+      const target=TARGETS[ball.skillTarget??2],dx=target.x-ball.x,dy=target.y-ball.y,length=Math.hypot(dx,dy);
+      const velocity=Math.hypot(ball.vx,ball.vy);ball.vx=dx/length*velocity;ball.vy=dy/length*velocity;ball.skillGuided=true;
     }
     ball.vy += 7.2 * dt;
     const drag = 1 - 0.065 * dt; ball.vx *= drag; ball.vy *= drag;

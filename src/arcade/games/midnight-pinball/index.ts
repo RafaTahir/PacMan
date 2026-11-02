@@ -19,7 +19,7 @@ export const gameDefinition: GameDefinition = {
     const stars = [0, 1, 2].map(i => s.targetBits & (1 << i) ? "★" : "☆").join(" ");
     return [
       { label: "MARKET ORDER", value: marketObjective(s.market,s.tick),kind:"combo" },
-      { label: "CALLED SHOT", value: `STAR ${s.skillTarget+1} · POWER ${Math.round(s.plungerCharge*100)}% · SWEET 55–75%` },
+      { label: "CALLED SHOT", value: s.balls.some(b=>b.mode==="plunger") ? `STAR ${s.skillTarget+1} · POWER ${Math.round(s.plungerCharge*100)}% · SWEET 55–75%` : `${s.superSkills} PRECISION PLUNGES · ORDERS SURVIVE DRAINS` },
       { label: "BALL", value: `${s.ballNumber} / 3`, kind: "health" },
       { label: "MULTIPLIER", value: `×${s.multiplier}`, kind: "combo" },
       { label: s.multiball ? "MULTIBALL" : "STAR LOCK", value: s.multiball ? `${s.balls.length} BALLS · RAMP JACKPOT` : s.targetBits === 7 ? "LIT · SHOOT LEFT RAMP" : stars, kind: "combo" },

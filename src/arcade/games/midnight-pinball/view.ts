@@ -119,6 +119,8 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   });
   const marketLamps=Array.from({length:3},(_,i)=>disk(-1+i,2.8,.07,.19,.08,material(0x655c32,C.gold,.1)));
   label("BUMPERS → STARS → ROUTES",0,3.25,.04,3.5,.3,"#ffe4a3",32);
+  label("DIVERTER",3.8,-5.35,.04,1.15,.25,"#ffb7ad",28);
+  const diverter=box(4.02,-4.9,.24,.5,.12,.22,chrome);diverter.rotation.z=.5;
   const calledRing=ring(0,0,.42,.43,pink,.045);
   const chargeBar=box(4.02,5.8,.25,.12,1,.08,cyan);
   const sweetSpot=box(4.23,5.65,.24,.08,.2,.06,gold);

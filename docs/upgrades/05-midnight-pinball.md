@@ -19,3 +19,7 @@ Before plunging, the flippers select a called target. Release the plunger at 55â
 ## Limits
 
 One original Malaysian island table remains; no commercial table library, world campaign, demons, licensed art/music or physics code was copied. The new objective ladder provides additional table mastery, not the references' complete content sets. Browser visual acceptance remains pending at release gate.
+
+### Launch reachability follow-up
+
+A legal-input trajectory probe showed the old shooter-lane geometry naturally reached only the right star across the new power window. An original launch diverter now opens for a precision plunge at the actual shooter-lane exit and directs the ball toward the selected star; all subsequent collisions remain physical. Three end-to-end tests now earn called shots at each target using only launch/flipper inputs, without teleporting the ball. The called-shot HUD switches to results after launch; ordinary drains preserve market progress, while tilt clears it. Festival completion awards its base reward before the temporary doubling applies to later scores. Updated focused total: **23 tests**, plus TypeScript.

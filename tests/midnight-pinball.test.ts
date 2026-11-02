@@ -196,3 +196,11 @@ describe('Midnight market modes and called skill shots',()=>{
     expect(sim.state.superSkills).toBe(1);expect(sim.state.score).toBe(6500);
   });
 });
+
+it.each([0,1,2])('can earn a called shot at star %i through an actual legal precision launch',target=>{
+  const sim=createSimulation(3);
+  for(let n=0;n<target;n++){sim.step(input(Buttons.SECONDARY));sim.step(input());}
+  for(let n=0;n<42;n++)sim.step(input(Buttons.LAUNCH));sim.step(input());
+  for(let n=0;n<180&&sim.state.superSkills===0;n++)sim.step(input());
+  expect(sim.state.superSkills).toBe(1);
+});
