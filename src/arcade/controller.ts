@@ -48,7 +48,7 @@ export class ArcadeController {
     this.callbacks.overlay("loading", definition.title, "Warming up the cabinet…");
     if (!this.build(1980)) return;
     this.phase = "intro";
-    this.callbacks.overlay("intro", definition.title, `${definition.description} Two-minute runs. Choose a global challenge or local practice.`);
+    this.callbacks.overlay("intro", definition.title, `${definition.description} ${this.selection === "hollow-bureau" ? "Two-minute local practice. Ranked runs are temporarily unavailable." : "Two-minute runs. Choose a global challenge or local practice."}`);
     this.raf = requestAnimationFrame(this.frame);
   }
   private build(seed: number): boolean {
@@ -94,6 +94,7 @@ export class ArcadeController {
   }
   async start(mode: "ranked" | "practice" = "ranked"): Promise<void> {
     if (!this.definition || this.phase === "disposed" || this.phase === "preparing") return;
+    if (this.selection === "hollow-bureau") mode = "practice";
     const revision = ++this.startRevision;
     this.preparationInterrupted = false;
     this.phase = "preparing"; this.input?.clear(); this.audio.setMuted(preference.muted); void this.audio.unlock();

@@ -178,6 +178,7 @@ async function startRun(request: Request, db: D1Database, env: Env, clock: () =>
   const body = await readJson(request);
   fields(body, ["game", "ruleset"]);
   const game = gameId(body.game);
+  if (game === "hollow-bureau") throw new ApiError(503, "ranked_unavailable", "Hollow Bureau is available in local practice; ranked runs are temporarily unavailable.");
   if (body.ruleset !== RULESET_VERSION) throw new ApiError(409, "ruleset_mismatch", "Reload the arcade to use the current ranked ruleset.");
   const runId = crypto.randomUUID();
   const seed = crypto.getRandomValues(new Uint32Array(1))[0] || 1;

@@ -82,8 +82,9 @@ function showOverlay(phase: string, title: string, copy: string, countdown = 0) 
   $("countdown-number").hidden = phase !== "countdown";
   $("countdown-number").textContent = String(countdown);
   $("play-start-button").hidden = !["intro", "ended"].includes(phase);
+  if (selected === "hollow-bureau") $("play-start-button").hidden = true;
   $("play-practice-button").hidden = !["intro", "ended", "unavailable"].includes(phase);
-  $("play-practice-button").textContent = phase === "unavailable" ? "Try Pac-Man" : selected === "pacman" ? "Classic local play" : "Local practice";
+  $("play-practice-button").textContent = phase === "unavailable" ? "Try Pac-Man" : selected === "pacman" ? "Classic local play" : selected === "hollow-bureau" ? "Play local practice" : "Local practice";
   $("play-resume-button").hidden = phase !== "paused";
   $("play-keep-paused").hidden = phase !== "countdown";
   $<HTMLButtonElement>("play-pause-button").disabled = !["playing", "paused", "countdown", "ready"].includes(phase);
@@ -96,16 +97,17 @@ function showOverlay(phase: string, title: string, copy: string, countdown = 0) 
   if (phase === "countdown") announce(`Resuming in ${countdown}. Choose your direction.`);
   updateMode();
   if (["intro", "paused"].includes(phase) && !childOwns)
-    requestAnimationFrame(() => { if (!modalOpen()) $(phase === "intro" ? "play-start-button" : "play-resume-button").focus({ preventScroll: true }); });
+    requestAnimationFrame(() => { if (!modalOpen()) $(phase === "intro" ? selected === "hollow-bureau" ? "play-practice-button" : "play-start-button" : "play-resume-button").focus({ preventScroll: true }); });
 }
 function updateMode() {
   const game = active();
-  const savingCopy = !game || ["intro", "loading", "preparing"].includes(game.phase)
+  const savingCopy = selected === "hollow-bureau" ? "Hollow Bureau: local practice only. Ranked runs are temporarily unavailable."
+    : !game || ["intro", "loading", "preparing"].includes(game.phase)
     ? "Ranked: post to the global board after your run. Practice: local best only."
     : game.ranked ? "Global score not posted yet · finish, enter initials and save."
     : "Practice · local best on this device · no global submission.";
   if (game?.phase !== "ended" && $("score-save-status").textContent !== savingCopy) $("score-save-status").textContent = savingCopy;
-  $("play-mode").textContent = !game || ["intro", "loading"].includes(game.phase) ? "FREE PLAY · CHOOSE YOUR RUN"
+  $("play-mode").textContent = selected === "hollow-bureau" ? "LOCAL PRACTICE · ON THIS DEVICE" : !game || ["intro", "loading"].includes(game.phase) ? "FREE PLAY · CHOOSE YOUR RUN"
     : game.ranked ? "RANKED · REPLAY CHECKED · 2 MIN" : selected === "pacman" ? "CLASSIC LOCAL · ON THIS DEVICE" : "LOCAL PRACTICE · ON THIS DEVICE";
 }
 function updateHud(definition: GameDefinition, simulation: ArcadeSimulation) {

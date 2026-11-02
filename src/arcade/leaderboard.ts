@@ -41,7 +41,7 @@ export class Leaderboard {
       }
       table.hidden = board.entries.length === 0;
       this.state.hidden = board.entries.length > 0;
-      this.state.textContent = "The board is open. Set the first real score.";
+      this.state.textContent = this.game.value === "hollow-bureau" ? "Ranked runs are temporarily unavailable for Hollow Bureau." : "The board is open. Set the first real score.";
       this.state.dataset.state = board.entries.length ? "ready" : "empty";
       this.updated.textContent = `Updated ${new Date(board.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · refreshes every 15s`;
       this.updated.dataset.live = "true";
