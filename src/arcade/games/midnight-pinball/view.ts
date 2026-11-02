@@ -117,6 +117,11 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
     disk(b.x, b.y, 0.56, b.radius * 0.17, 0.07, gold);
     label(["100", "100", "100"][i], b.x, b.y + 0.03, 0.54, 0.6, 0.27, "#edffff", 48);
   });
+  const marketLamps=Array.from({length:3},(_,i)=>disk(-1+i,2.8,.07,.19,.08,material(0x655c32,C.gold,.1)));
+  label("BUMPERS → STARS → ROUTES",0,3.25,.04,3.5,.3,"#ffe4a3",32);
+  const calledRing=ring(0,0,.42,.43,pink,.045);
+  const chargeBar=box(4.02,5.8,.25,.12,1,.08,cyan);
+  const sweetSpot=box(4.23,5.65,.24,.08,.2,.06,gold);
   const targetLamps: THREE.Mesh[] = [];
   TARGETS.forEach(t => {
     box(t.x, t.y, 0.16, 0.72, 0.5, 0.28, rail); box(t.x, t.y - 0.13, 0.33, 0.62, 0.18, 0.3, chrome);
@@ -189,7 +194,7 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   // one draw call; animated mechanisms and transparent layers remain separate.
   // Keeping material identities preserves live high-contrast color updates.
   const dynamic = new Set<THREE.Object3D>([
-    ...bumperCaps, ...targetLamps, ...slingCaps, ...tourLamps, lockLamp,
+    ...marketLamps, calledRing, chargeBar, sweetSpot, ...bumperCaps, ...targetLamps, ...slingCaps, ...tourLamps, lockLamp,
     saveLamp, plunger, ...balls, ...shadows, ...ballRings, ...particles.map(p => p.mesh),
   ]);
   const batches = new Map<THREE.Material, THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]>();
@@ -233,6 +238,10 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   return {
     resize,
     update(alpha: number, options: VisualOptions) {
+      marketLamps.forEach((lamp,i)=>{(lamp.material as THREE.MeshStandardMaterial).emissiveIntensity=state.market.festivalUntil>state.tick||i<state.market.step?2:i===state.market.step?.65:.08;});
+      const skill=TARGETS[state.skillTarget];calledRing.position.copy(vector(skill.x,skill.y,.42));calledRing.visible=state.balls.some(b=>b.mode==="plunger"||b.skillShot&&state.tick-b.launchedAt<180);
+      chargeBar.scale.y=Math.max(.02,state.plungerCharge);chargeBar.position.y=-6.15+state.plungerCharge*.5;
+      sweetSpot.visible=state.balls.some(b=>b.mode==="plunger");chargeBar.visible=sweetSpot.visible;
       const t = Math.max(0, Math.min(1, alpha)), advanced = state.tick !== lastTick;
       if (options.highContrast) { bed.color.setHex(0x020913); rail.color.setHex(0x7497b6); }
       else { bed.color.setHex(0x083d37); rail.color.setHex(0x263e59); }

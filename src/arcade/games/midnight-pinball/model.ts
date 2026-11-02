@@ -1,3 +1,4 @@
+import { createMarket, marketContact, type MarketMode } from "./market";
 import { Buttons, DT, MAX_TICKS, type ArcadeInput, type ArcadeSimulation, type ArcadeState, type GameSignal } from "../../shared/contracts";
 import { clamp, seededRandom } from "../../shared/math";
 
@@ -8,10 +9,12 @@ export interface PinballBall {
   id: number; x: number; y: number; z: number; px: number; py: number; pz: number;
   vx: number; vy: number; vz: number; mode: BallMode;
   rampDistance: number; rampSpeed: number; contactCooldown: number;
+  skillTarget?:number; precisionLaunch?:boolean;
   launchedAt: number; skillShot: boolean; saveEligible: boolean;
 }
 export interface Flipper { x: number; y: number; length: number; angle: number; previousAngle: number; omega: number }
 export interface PinballState extends ArcadeState {
+  market:MarketMode; skillTarget:number; superSkills:number;
   balls: PinballBall[]; flippers: [Flipper, Flipper]; ballsRemaining: number; ballNumber: number;
   multiplier: number; targetBits: number; rampShots: number; riverShots: number; tourBits: number; tours: number; jackpots: number; multiball: boolean;
   ballSaveUntil: number; serveAt: number; plungerCharge: number; tilt: number; tilted: boolean;
@@ -142,6 +145,7 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
   const random = seededRandom(seed);
   let nextId = 1, previousButtons = 0;
   const state: PinballState = {
+    market:createMarket(),skillTarget:seed%3,superSkills:0,
     seed: seed >>> 0, tick: 0, score: 0, status: "playing", balls: [],
     flippers: [{ x: -2.2, y: 5.08, length: 2, angle: 0.43, previousAngle: 0.43, omega: 0 }, { x: 2.2, y: 5.08, length: 2, angle: Math.PI - 0.43, previousAngle: Math.PI - 0.43, omega: 0 }],
     ballsRemaining: 3, ballNumber: 1, multiplier: 1, targetBits: 0, rampShots: 0, riverShots: 0, tourBits: 0, tours: 0, jackpots: 0, multiball: false,
@@ -152,8 +156,13 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
   let signals: GameSignal[] = [];
   const flipperRails = state.flippers.map(f => prepareRail({ ax: f.x, ay: f.y, bx: f.x + Math.cos(f.angle) * f.length, by: f.y + Math.sin(f.angle) * f.length }, BALL_RADIUS + 0.14));
   const announce = (message: string, duration = 150) => { state.message = message; state.messageUntil = state.tick + duration; };
-  const award = (points: number) => { if (!state.tilted) { const value = points * state.multiplier; state.score += value; signals.push({ type: "score", value }); } };
+  const award = (points: number, festival = true) => { if (!state.tilted) { const value = points * state.multiplier * (festival && state.market.festivalUntil>state.tick?2:1); state.score += value; signals.push({ type: "score", value }); } };
   const flash = (ball: PinballBall) => { state.hitSerial++; state.lastHit = { x: ball.x, y: ball.y, z: ball.z }; state.contacts++; };
+  function marketHit(kind:'bumper'|'target'|'ramp'|'river',index=0){
+    if(state.tilted)return;
+    const reward=marketContact(state.market,kind,index,state.tick);
+    if(reward){award(reward,false);announce(state.market.festivalUntil>state.tick?"NIGHT FESTIVAL · ALL SCORES ×2":"MARKET ORDER COMPLETE · NEXT ORDER",240);signals.push({type:"upgrade"});}
+  }
   function serve(auto = false, regular = false): PinballBall {
     const b: PinballBall = { id: nextId++, x: 4.02 + (random() - 0.5) * 0.03, y: 6.42, z: BALL_RADIUS, px: 4.02, py: 6.42, pz: BALL_RADIUS, vx: 0, vy: 0, vz: 0, mode: "plunger", rampDistance: 0, rampSpeed: 0, contactCooldown: 0, launchedAt: -999, skillShot: false, saveEligible: regular };
     state.balls.push(b);
@@ -162,7 +171,7 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
   }
   function launch(ball: PinballBall, charge: number) {
     ball.mode = "table"; ball.vy = -(20 + 7 * charge); ball.vx = (random() - 0.5) * 0.18;
-    ball.launchedAt = state.tick; ball.skillShot = true;
+    ball.launchedAt = state.tick; ball.skillShot = true; ball.skillTarget=state.skillTarget;ball.precisionLaunch=charge>=.55&&charge<=.75;
     state.plungerCharge = 0;
     if (ball.saveEligible && !state.tilted) state.ballSaveUntil = state.tick + 480;
     ball.saveEligible = false;
@@ -178,7 +187,7 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
       while (state.balls.length < 3) serve(true);
       announce("PASAR MALAM MULTIBALL · BOTH ROUTES SCORE JACKPOT", 240); signals.push({ type: "multiball" });
     } else { award(1500); announce("ISLAND RAMP · SHOOT THE RIGHT RIVER ORBIT"); signals.push({ type: "boost" }); }
-    finishTour(1);
+    finishTour(1);marketHit("ramp");
     flash(ball);
   }
   function finishTour(bit: number) {
@@ -196,7 +205,7 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
     award(state.multiball ? 3000 : 900);
     if (state.multiball) { state.jackpots++; announce("RIVER JACKPOT!"); signals.push({ type: "chain" }); }
     else { announce("RIVER ORBIT · SHOOT LEFT RAMP FOR ISLAND TOUR"); signals.push({ type: "boost" }); }
-    finishTour(2); flash(ball);
+    finishTour(2);marketHit("river"); flash(ball);
   }
   function moveRamp(ball: PinballBall, dt: number) {
     const river = ball.mode === "river", pointAt = river ? riverPoint : rampPoint, length = river ? RIVER_LENGTH : RAMP_LENGTH;
@@ -266,12 +275,12 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
         ball.vx -= (1 + restitution) * normalSpeed * hit.nx; ball.vy -= (1 + restitution) * normalSpeed * hit.ny;
         if (bestType === 2) {
           const index = bestIndex;
-          if (state.bumperFlash[index] === 0 && !state.tilted) { const kick = Math.max(0, 11.5 - (ball.vx * hit.nx + ball.vy * hit.ny)); ball.vx += kick * hit.nx; ball.vy += kick * hit.ny; state.bumperFlash[index] = 10; award(100); flash(ball); signals.push({ type: "bounce" }); }
+          if (state.bumperFlash[index] === 0 && !state.tilted) { const kick = Math.max(0, 11.5 - (ball.vx * hit.nx + ball.vy * hit.ny)); ball.vx += kick * hit.nx; ball.vy += kick * hit.ny; state.bumperFlash[index] = 10; award(100); marketHit("bumper",index); flash(ball); signals.push({ type: "bounce" }); }
         } else if (bestType === 3) {
           const index = bestIndex;
           if (state.targetFlash[index] === 0 && !state.tilted) {
-            state.targetFlash[index] = 18; const before = state.targetBits; state.targetBits |= 1 << index; award(500); flash(ball); signals.push({ type: "hit" });
-            if (ball.skillShot && state.tick - ball.launchedAt < 180) { ball.skillShot = false; award(2000); announce("SKILL SHOT +2,000"); }
+            state.targetFlash[index] = 18; const before = state.targetBits; state.targetBits |= 1 << index; award(500);marketHit("target",index); flash(ball); signals.push({ type: "hit" });
+            if (ball.skillShot && state.tick - ball.launchedAt < 180) { ball.skillShot = false; const precise=ball.precisionLaunch&&ball.skillTarget===index; if(precise)state.superSkills++;award(precise?6000:2000); announce(precise?"CALLED SKILL SHOT +6,000":"SKILL SHOT +2,000"); }
             if (state.targetBits === 7 && before !== 7) { award(1000); announce("LOCK LIT · SHOOT THE LEFT RAMP!", 240); signals.push({ type: "upgrade" }); }
           }
         } else if (sling !== undefined && state.slingFlash[sling] === 0 && !state.tilted) {
@@ -295,17 +304,20 @@ export function createSimulation(seed: number): ArcadeSimulation<PinballState> {
       state.tick++;
       if (state.tick >= MAX_TICKS) { state.status = "gameover"; announce("LAST CALL · FINAL SCORE", 600); signals.push({ type: "lose" }); return signals; }
       for (const flashes of [state.bumperFlash, state.targetFlash, state.slingFlash]) for (let i = 0; i < flashes.length; i++) flashes[i] = Math.max(0, flashes[i] - 1);
+      if(state.market.deadline && state.tick>state.market.deadline){state.market.step=0;state.market.progress=0;state.market.deadline=0;announce("MARKET ORDER EXPIRED · BUMPERS TO RESTART");}
       state.nudgeCooldown = Math.max(0, state.nudgeCooldown - 1); state.tilt = Math.max(0, state.tilt - 0.0007);
       if (state.serveAt > 0 && state.tick >= state.serveAt) { state.serveAt = 0; state.ballNumber++; state.tilted = false; state.tilt = 0; serve(false, true); announce("HOLD LAUNCH · RELEASE TO PLUNGE"); }
       if (!state.tilted && state.nudgeCooldown === 0 && Math.hypot(input.x, input.y) > 60 && state.balls.some(b => b.mode !== "plunger")) {
         const x = clamp(input.x / 127, -1, 1), y = clamp(input.y / 127, -1, 1);
         for (const b of state.balls) if (b.mode === "table" || b.mode === "air") { b.vx += x * 2.7; b.vy += y * 2.7; }
         state.tilt += 0.34; state.nudgeCooldown = 70; signals.push({ type: "dash" });
-        if (state.tilt >= 1) { state.tilted = true; state.ballSaveUntil = 0; announce("TILT · FLIPPERS DISABLED", 360); signals.push({ type: "death" }); }
+        if (state.tilt >= 1) { state.tilted = true; state.ballSaveUntil = 0;state.market=createMarket(); announce("TILT · FLIPPERS DISABLED", 360); signals.push({ type: "death" }); }
         else if (state.tilt > 0.6) announce("DANGER · LET THE TABLE SETTLE");
       }
       const plunger = state.balls.find(ball => ball.mode === "plunger");
       if (plunger) {
+        if((input.buttons&Buttons.PRIMARY)&&!(previousButtons&Buttons.PRIMARY))state.skillTarget=(state.skillTarget+2)%3;
+        if((input.buttons&Buttons.SECONDARY)&&!(previousButtons&Buttons.SECONDARY))state.skillTarget=(state.skillTarget+1)%3;
         if (input.buttons & Buttons.LAUNCH) state.plungerCharge = Math.min(1, state.plungerCharge + 1 / 65);
         // A quick tap still launches at useful power; holding tunes the skill shot.
         if (!(input.buttons & Buttons.LAUNCH) && (previousButtons & Buttons.LAUNCH)) launch(plunger, Math.max(0.38, state.plungerCharge));

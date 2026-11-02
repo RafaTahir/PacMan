@@ -186,3 +186,13 @@ describe("MIDNIGHT PINBALL physical play", () => {
     expect(sim.state.multiplier).toBeGreaterThan(1); expect(sim.state.score).toBeGreaterThan(10000);
   });
 });
+
+describe('Midnight market modes and called skill shots',()=>{
+  it('lets flippers select a called target before a precision plunge',()=>{
+    const sim=createSimulation(3);sim.step(input(Buttons.SECONDARY));expect(sim.state.skillTarget).toBe(1);
+    sim.step(input());for(let i=0;i<42;i++)sim.step(input(Buttons.LAUNCH));sim.step(input());
+    const b=sim.state.balls[0];expect(b.precisionLaunch).toBe(true);expect(b.skillTarget).toBe(1);
+    const target=TARGETS[1];Object.assign(b,{x:target.x,y:target.y+.6,vx:0,vy:-15});sim.step(input());
+    expect(sim.state.superSkills).toBe(1);expect(sim.state.score).toBe(6500);
+  });
+});
