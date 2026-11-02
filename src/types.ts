@@ -46,7 +46,9 @@ export interface Popup {
   text: string;
   ttl: number;
 }
+import type { RelayState } from "./relay";
 export interface GameState {
+  relay: RelayState | null;
   phase: Phase;
   paused: boolean;
   score: number;

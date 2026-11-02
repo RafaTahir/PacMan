@@ -21,7 +21,7 @@ function activeInput(game: GameId, tick: number): ArcadeInput {
 function sample(game: GameId, seed: number, active: boolean): { frames: number; inputs: ReplayInput[]; score: number } {
   const inputs: ReplayInput[] = [];
   let last: ArcadeInput = { ...NEUTRAL_INPUT };
-  const pacman = game === "pacman" ? new Game({ seed }) : null;
+  const pacman = game === "pacman" ? new Game({ relay: true, seed }) : null;
   pacman?.start();
   const simulation = game === "pacman" ? null : simulationFactories[game](seed);
   let frames = 0;

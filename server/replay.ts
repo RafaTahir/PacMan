@@ -54,7 +54,7 @@ export function replayScore(gameId: GameId, seed: number, frames: number, inputs
   let terminal = false;
   let score = 0;
   if (gameId === "pacman") {
-    const game = new Game({ seed });
+    const game = new Game({ relay: true, seed });
     game.start();
     for (let tick = 0; tick < frames; tick++) {
       if (terminal) throw new ApiError(400, "trailing_frames", "Replay continues after the game ended.");

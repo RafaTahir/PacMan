@@ -8,6 +8,7 @@ import type {
   Pacman,
   Phase,
 } from "./types";
+import { advanceRelay, createRelay } from "./relay";
 import { COLS, initialPellets, isWalkable, key } from "./maze";
 import {
   BASE_SPEED,
@@ -184,8 +185,10 @@ export class Game {
   private scorePause = 0;
   private extraLifeAwarded = false;
   private readyDuration = 2;
+  private relayEnabled: boolean;
 
-  constructor(options: { highScore?: number; seed?: number } = {}) {
+  constructor(options: { highScore?: number; seed?: number; relay?: boolean } = {}) {
+    this.relayEnabled = options.relay ?? false;
     this.initialSeed = (options.seed ?? 0x19801980) >>> 0 || 1;
     this.randomState = this.initialSeed;
     this.state = this.freshState(Math.max(0, options.highScore ?? 0));
@@ -195,6 +198,7 @@ export class Game {
   private freshState(highScore: number): GameState {
     return {
       phase: "title",
+      relay: this.relayEnabled ? createRelay(this.initialSeed) : null,
       paused: false,
       score: 0,
       highScore,
@@ -326,6 +330,7 @@ export class Game {
     }
 
     this.updateTimers();
+    if (s.relay) this.award(advanceRelay(s.relay, -1, -1, false, s.frame));
     this.updateHouseRelease();
     this.movePacman();
     if (s.phase !== "playing") return;
@@ -343,6 +348,9 @@ export class Game {
     s.frightChain = 0;
     s.fruit = null;
     s.popups = [];
+    if (s.relay && afterDeath) {
+      s.relay.streak = 0; s.relay.collected = 0; s.relay.deadline = 0; s.relay.ward = false; s.relay.graceUntil = 0;
+    }
     this.motions.clear();
     this.motions.set(s.pacman, { x: 13, y: 23 });
     this.motions.set(s.ghosts[0], { x: 13, y: 11 });
@@ -553,7 +561,16 @@ export class Game {
       tile = actorTile(s.pacman),
       tileKey = key(tile.x, tile.y);
     const power = s.energizers.delete(tileKey);
-    if (!power && !s.pellets.delete(tileKey)) return;
+    const dot = power || s.pellets.delete(tileKey);
+    if (s.relay) {
+      const bonus = advanceRelay(s.relay, tile.x, tile.y, dot, s.frame);
+      if (bonus) {
+        this.award(bonus);
+        s.popups.push({x: tile.x, y: tile.y, text: `+${bonus}`, ttl: 1.2});
+        this.events.push({type: "fruit", value: bonus});
+      }
+    }
+    if (!dot) return;
     this.award(power ? 50 : 10);
     this.events.push({ type: power ? "energizer" : "pellet" });
     this.pelletPause = power ? 3 : 1;
@@ -838,6 +855,14 @@ export class Game {
         this.nextGhostDirections.delete(ghost.id);
         this.scorePause = 60;
       } else {
+        if (s.relay && (s.relay.ward || s.relay.graceUntil > s.frame)) {
+          if (s.relay.ward) {
+            s.relay.ward = false; s.relay.graceUntil = s.frame + 90;
+            s.relay.message = "WARD ABSORBED A HIT"; s.relay.messageUntil = s.frame + 120;
+            this.events.push({type: "energizer"});
+          }
+          continue;
+        }
         s.lives--;
         s.pacman.moving = false;
         this.setPhase("dying");

@@ -36,7 +36,7 @@ export class PacmanRankedSession {
 
   constructor(readonly seed: number, maxTicks = PACMAN_MAX_TICKS, highScore = 0) {
     this.maxTicks = Math.min(PACMAN_MAX_TICKS, Math.max(1, Math.floor(maxTicks)));
-    this.game = new Game({ seed, highScore });
+    this.game = new Game({ relay: true, seed, highScore });
     this.game.start();
   }
 

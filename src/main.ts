@@ -70,7 +70,7 @@ let coachWasVisible = false;
 let powerWarned = [false, false];
 let playerCount = 1;
 let activePlayer = 0;
-let games = [new Game({ highScore: best }), new Game({ highScore: best })];
+let games = [new Game({ relay: true, highScore: best }), new Game({ relay: true, highScore: best })];
 let atTitle = true;
 let lastTimestamp = 0;
 let intermission: { elapsed: number; level: number } | null = null;
@@ -82,7 +82,7 @@ const help = $<HTMLDialogElement>("help-dialog");
 const restartDialog = $<HTMLDialogElement>("restart-dialog");
 let helpWasPaused = false;
 let restartWasPaused = false;
-let demo = new Game({ seed: 1980 });
+let demo = new Game({ relay: true, seed: 1980 });
 let demoElapsed = 0;
 let demoDecision = 0;
 demo.start();
@@ -136,7 +136,7 @@ function startGame() {
   coachTip = seenTips.has("turns") ? null : "turns";
   powerWarned = [false, false];
   rankedSession = rankedConfig ? new PacmanRankedSession(rankedConfig.seed, rankedConfig.maxTicks, best) : null;
-  games = [rankedSession?.game ?? new Game({ highScore: best }), new Game({ highScore: best })];
+  games = [rankedSession?.game ?? new Game({ relay: true, highScore: best }), new Game({ relay: true, highScore: best })];
   bridgeFinished = false;
   bridgeSignature = "";
   activePlayer = 0;
@@ -163,7 +163,7 @@ function returnToTitle() {
   rankedConfig = null;
   rankedSession = null;
   intermission = null;
-  games = [new Game({ highScore: best }), new Game({ highScore: best })];
+  games = [new Game({ relay: true, highScore: best }), new Game({ relay: true, highScore: best })];
   activePlayer = 0;
   audio.update(game().state);
   updateInterface();
@@ -458,7 +458,7 @@ function updateInterface() {
       max >= best && max > 0 ? "YOUR PERSONAL BEST" : "A GOOD RUN";
     $("result-copy").textContent =
       playerCount === 1
-        ? "There’s always one more round."
+        ? state.relay ? `${state.relay.circuits} relay circuits completed. One more route awaits.` : "There’s always one more round."
         : games[0].state.score === games[1].state.score
           ? "A perfect tie. Settle it in the maze."
           : `Player ${games[0].state.score > games[1].state.score ? "1" : "2"} takes the high score.`;
@@ -495,7 +495,7 @@ function handleEvents(events: GameEvent[]) {
     if (event.type === "level")
       announce(`Maze complete. Level ${game().state.level + 1} coming up.`);
     if (event.type === "fruit")
-      announce(`Bonus fruit. ${event.value ?? ""} points.`);
+      announce(`Bonus. ${event.value ?? ""} points.`);
     if (event.type === "game-over" && isOver()) {
       announce(`Game over. Score ${game().state.score}.`);
       requestAnimationFrame(() =>
@@ -604,7 +604,7 @@ function frame(timestamp: number) {
       demo.update(delta);
       demo.drainEvents();
       if (demo.state.phase === "game-over" || demoElapsed > 95) {
-        demo = new Game({ seed: 1980 });
+        demo = new Game({ relay: true, seed: 1980 });
         demo.start();
         demoElapsed = 0;
       }

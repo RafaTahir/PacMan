@@ -118,7 +118,7 @@ export class PacmanAdapter {
   private introCopy(): string {
     const graphics = this.graphics === "webgl" ? "3D mesh graphics" : this.graphics === "canvas-fallback"
       ? "2D fallback graphics (3D is unavailable in this browser)" : "graphics selected by your browser";
-    return `The original maze with ${graphics}, sound and two-player classic. Choose a two-minute global challenge or classic local play.`;
+    return `Circuit Relay with ${graphics}. Follow four numbered beacons, keep the dot-flow streak alive and earn a protective ward. Choose a two-minute global challenge or local play.`;
   }
   private isDisposed(): boolean { return this.phase === "disposed"; }
   private post(command: HostCommand): void { this.iframe.contentWindow?.postMessage({ channel: PACMAN_BRIDGE, ...command }, this.origin); }

@@ -1,3 +1,4 @@
+import { RELAY_BEACONS } from "./relay";
 import { COLS, ROWS, MAZE } from "./maze";
 import { MeshRenderer } from "./mesh-renderer";
 import { getLevelConfig } from "./levels";
@@ -408,6 +409,7 @@ export class Renderer {
       this.drawWrapped(state.pacman.x, state.pacman.y, (x, y) =>
         this.drawPacman(x, y, state, options.reducedMotion),
       );
+    if (state.relay && state.phase !== "title") this.drawRelay(state, options.reducedMotion);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const popup of state.popups) {
@@ -438,6 +440,38 @@ export class Renderer {
         this.meshCost = 0;
       }
     }
+  }
+
+  /** Authored geometric relay artwork is composited over both graphics paths. */
+  private drawRelay(state: GameState, reducedMotion: boolean): void {
+    const r = state.relay!, ctx = this.ctx;
+    ctx.save();
+    RELAY_BEACONS.forEach((beacon, i) => {
+      const active = i === r.target, x = (beacon.x + .5) * TILE, y = (beacon.y + .5) * TILE;
+      const radius = active && !reducedMotion ? 13 + Math.sin(state.time * 4) * 2 : 13;
+      ctx.strokeStyle = active ? "#fff1a6" : "#5b8099";
+      ctx.lineWidth = active ? 3 : 1;
+      ctx.globalAlpha = active ? 1 : .45;
+      ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+      if (active) {
+        ctx.fillStyle = "#06101c"; ctx.fillRect(x - 6, y - 7, 12, 14);
+        ctx.fillStyle = "#fff1a6"; ctx.font = 'bold 12px "Courier New", monospace';
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(r.collected + 1), x, y);
+      }
+    });
+    ctx.globalAlpha = 1;
+    if (r.ward || r.graceUntil > state.frame) {
+      ctx.strokeStyle = "#a4ffee"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc((state.pacman.x + .5) * TILE, (state.pacman.y + .5) * TILE, 21, 0, TAU); ctx.stroke();
+    }
+    ctx.fillStyle = "#07111d"; ctx.fillRect(0, 10 * TILE, 5.8 * TILE, 3.3 * TILE);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffe5a0"; ctx.font = 'bold 12px "Courier New", monospace';
+    ctx.fillText(`RELAY ${r.collected}/4`, 2.8 * TILE, 10.6 * TILE);
+    ctx.fillStyle = "#c6e3ee";
+    ctx.fillText(r.deadline ? `${Math.max(0, Math.ceil((r.deadline-state.frame) / 60.606))}s TO BEACON` : "FIND THE RING", 2.8 * TILE, 11.4 * TILE);
+    ctx.fillText(r.ward ? "WARD READY" : `FLOW ${r.streak}`, 2.8 * TILE, 12.2 * TILE);
+    ctx.restore();
   }
 
   private drawWrapped(
