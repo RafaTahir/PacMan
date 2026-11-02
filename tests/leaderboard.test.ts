@@ -162,7 +162,7 @@ describe("persistent D1 leaderboards", () => {
     }
     expect(db.sqlite.prepare("SELECT COUNT(*) AS n FROM scores").get()?.n).toBe(0);
   });
-  it.each(GAME_IDS)("accepts and persists a model-derived ranked %s score", async (game) => {
+  it.each(GAME_IDS.filter(game => game !== "hollow-bureau"))("accepts and persists a model-derived ranked %s score", async (game) => {
     const run = await start(game);
     expect(run).toMatchObject({ game, ruleset: RULESET_VERSION, ...runLimits(game) });
     expect(run.seed).toBeGreaterThan(0);
@@ -175,6 +175,22 @@ describe("persistent D1 leaderboards", () => {
     expect(board.entries).toEqual([result.entry]);
     expect(db.sqlite.prepare(`SELECT status FROM ${isAdditionalCabinet(game) ? "cabinet_runs" : "runs"} WHERE id = ?`).get(run.runId)?.status).toBe("accepted");
     expect(db.statements.every((sql) => !sql.includes(";") && !/\bCREATE\b/i.test(sql))).toBe(true);
+  });
+  it("rejects Hollow Bureau ranked runs against the 0002 schema while retaining existing scores", async () => {
+    db.close();
+    db = new SQLiteD1(":memory:", false);
+    for (const file of readdirSync("drizzle").filter(name => /^000[0-2].*\.sql$/.test(name)).sort())
+      db.sqlite.exec(readFileSync(join("drizzle", file), "utf8"));
+    env = { DB: db };
+    const existing = await start("orbit-salvage");
+    expect((await finish(existing)).status).toBe(200);
+    const before = db.sqlite.prepare("SELECT * FROM cabinet_scores").all();
+    const response = await request("/api/runs", { game: "hollow-bureau", ruleset: RULESET_VERSION });
+    expect(response.status).toBe(503);
+    expect(await bodyOf(response)).toMatchObject({ error: { code: "ranked_unavailable" } });
+    expect(db.sqlite.prepare("SELECT * FROM cabinet_scores").all()).toEqual(before);
+    expect(db.sqlite.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    expect((await bodyOf(await request("/api/leaderboards?game=orbit-salvage"))).entries).toHaveLength(1);
   });
   it("keeps duplicate guest initials and ranks actual scores with deterministic ties", async () => {
     const entries: any[] = [];
@@ -533,7 +549,7 @@ describe("additive ten-cabinet storage", () => {
       expect(legacy.prepare("SELECT count(*) AS n FROM cabinet_scores").get()?.n).toBe(0);
     } finally { legacy.close(); }
   });
-  it.each(GAME_IDS.filter(isAdditionalCabinet))("rejects a forged score for added cabinet %s without creating a leaderboard row", async (game) => {
+  it.each(GAME_IDS.filter(game => game !== "hollow-bureau" && isAdditionalCabinet(game)))("rejects a forged score for added cabinet %s without creating a leaderboard row", async (game) => {
     const run = await start(game);
     const replay = completed(game, run.seed);
     const response = await finish(run, "TST", { ...replay, score: replay.score + 1 });
