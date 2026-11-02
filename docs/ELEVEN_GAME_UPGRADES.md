@@ -8,8 +8,8 @@ Starting source: `62b622a80b994ebc27ecde33e21ebf3087275950`, tree `9875391b03df4
 | 2 | Neon Rally | Implemented; 18 model tests/type checks pass | [Research and acceptance](upgrades/02-neon-rally.md) |
 | 3 | Reactor Breaker | Implemented; 24 model tests/type checks pass | [Research and acceptance](upgrades/03-reactor-breaker.md) |
 | 4 | Chrome Siege | Implemented; 14 model/view tests/type checks pass | [Research and acceptance](upgrades/04-chrome-siege.md) |
-| 5 | Midnight Pinball | Implemented; 20 model tests/type checks pass | [Research and acceptance](upgrades/05-midnight-pinball.md) |
-| 6 | Orbit Salvage | Pending | — |
+| 5 | Midnight Pinball | Implemented; 23 model tests/type checks pass | [Research and acceptance](upgrades/05-midnight-pinball.md) |
+| 6 | Orbit Salvage | Implemented; 14 model tests/type checks and two browser layouts pass | [Research and acceptance](upgrades/06-orbit-salvage.md) |
 | 7 | Tidal Courier | Pending | — |
 | 8 | Prism Circuit | Pending | — |
 | 9 | Skybound Stack | Pending | — |
