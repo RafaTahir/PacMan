@@ -15,4 +15,5 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm test
+      - run: node scripts/verify-migration-release.mjs
       - run: npm run build

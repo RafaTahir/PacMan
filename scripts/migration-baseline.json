@@ -1,0 +1,43 @@
+{
+  "sourceCommit": "b6a578bce92fa1c9e00dbc5c3e08454101763d2b",
+  "files": {
+    "drizzle/0000_initial_leaderboards.sql": "c6f9ca90e71b4b814e5b8c3e70ee10c1dbece00176418fdcc1f992f248c4e8dd",
+    "drizzle/0001_recoverable_claims_and_pending_expiry.sql": "f3009c5f61c05f761eeea92e2f31dcfca8770724e460696c83a3ff9d606c463c",
+    "drizzle/0002_additional_cabinets.sql": "0c725c278437cbd5fe777441d8ce541817edc8f6088c3b26b8f0f64a5db1832a",
+    "drizzle/0003_hollow_bureau_cabinet.sql": "b763cd8f0a4b7fad08fd5df0df4c480eace4aa6f5cfd25d3cad32458a7df13e7",
+    "drizzle/meta/0000_snapshot.json": "c76372d259445a328eea3841e93b1be8d121ea729b952984d0fd26e731151089",
+    "drizzle/meta/0001_snapshot.json": "48e2099ef2da26a6b3ade52732003d1ce75211c0784fc450d58867f11ca5be9f",
+    "drizzle/meta/0002_snapshot.json": "57c3d0c6b1e15ad7e9ffb244568c1c50fa6a8ae8f487493a2fc6206e2a1cefb7",
+    "drizzle/meta/0003_snapshot.json": "703f688970a72ee2ec576f3ebd1e89b70413881ef8646b783cb67b1c48695fdf"
+  },
+  "journalEntries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792954474047,
+      "tag": "0000_initial_leaderboards",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792955660253,
+      "tag": "0001_recoverable_claims_and_pending_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793159219190,
+      "tag": "0002_additional_cabinets",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793521403654,
+      "tag": "0003_hollow_bureau_cabinet",
+      "breakpoints": true
+    }
+  ]
+}

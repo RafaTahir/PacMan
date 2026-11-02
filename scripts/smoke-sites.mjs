@@ -56,7 +56,7 @@ async function sameTree(folder) {
 }
 await sameTree("drizzle");
 const hosting = JSON.parse(await readFile("dist-sites/.openai/hosting.json", "utf8"));
-assert.equal(hosting.project_id, "appgprj_6add9f91d5088191b2397efdda9c3663");
+assert.equal(hosting.project_id, JSON.parse(await readFile('.openai/hosting.json', 'utf8')).project_id);
 assert.equal(hosting.d1, "DB"); assert.equal(hosting.r2, null); assert.equal(hosting.static_dir, undefined);
 console.log(JSON.stringify({ packagedWorker: "passed", assetsGETAndHEAD: checkedAssets, spaAnd404: "passed", conditionalGET: "passed",
   apiStatusHeadersAndDBForwarding: "passed (binding stub; existing real D1 integration unchanged)", migrationsAndHosting: "byte-preserved" }));
