@@ -23,3 +23,21 @@ One original Malaysian island table remains; no commercial table library, world 
 ### Launch reachability follow-up
 
 A legal-input trajectory probe showed the old shooter-lane geometry naturally reached only the right star across the new power window. An original launch diverter now opens for a precision plunge at the actual shooter-lane exit and directs the ball toward the selected star; all subsequent collisions remain physical. Three end-to-end tests now earn called shots at each target using only launch/flipper inputs, without teleporting the ball. The called-shot HUD switches to results after launch; ordinary drains preserve market progress, while tilt clears it. Festival completion awards its base reward before the temporary doubling applies to later scores. Updated focused total: **23 tests**, plus TypeScript.
+
+### Gauge and batching audit
+
+The visible plunger sweet-spot band previously represented 40–60% even though the
+model required 55–75%. Its position now matches the actual precision interval.
+A scene-geometry regression verifies both interval edges after static batching,
+checks the charge/marker meshes remain independently animated, hides them after
+launch, and checks disposal. The focused pinball/market/view/runtime suite passes
+37 tests; TypeScript and diff checks pass. A separate legal-input probe earned
+all 195 called shots across five seeds, three targets and every integer charge
+length from 36 through 48 ticks, without changing model state.
+
+Headless Chromium rendered the 65% gauge and festival HUD correctly (62 draw
+calls, 60 geometries for the inspected fixture). No scene/batching exceptions or
+merge warnings appeared; the browser emitted its autoplay-policy warning and
+software-driver ReadPixels performance warnings. These observations are not a
+hardware rendering performance guarantee. Earlier shared-HUD acceptance covers
+this table at desktop, portrait touch and landscape touch sizes.

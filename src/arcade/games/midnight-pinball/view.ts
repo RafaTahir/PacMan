@@ -123,7 +123,8 @@ export function createView(stage: ThreeStage, state: PinballState): ArcadeView {
   const diverter=box(4.02,-4.9,.24,.5,.12,.22,chrome);diverter.rotation.z=.5;
   const calledRing=ring(0,0,.42,.43,pink,.045);
   const chargeBar=box(4.02,5.8,.25,.12,1,.08,cyan);
-  const sweetSpot=box(4.23,5.65,.24,.08,.2,.06,gold);
+  const sweetSpot=box(4.23,5.50,.24,.08,.2,.06,gold);
+  chargeBar.name="plunger-charge";sweetSpot.name="plunger-sweet-spot";
   const targetLamps: THREE.Mesh[] = [];
   TARGETS.forEach(t => {
     box(t.x, t.y, 0.16, 0.72, 0.5, 0.28, rail); box(t.x, t.y - 0.13, 0.33, 0.62, 0.18, 0.3, chrome);
