@@ -119,7 +119,7 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
   mesh(rescuePod,box,gold,0,.76,0,.55,.08,.48);
   for(const x of [-.2,.2])mesh(rescuePod,sphere,white,x,.5,-.34,.07,.07,.05);
   flatRing(rescuePod,gold,.95);
-  const rescueArrow=mesh(root,cone,gold,0,.1,0,.35,.6,.25);rescueArrow.rotation.x=-Math.PI/2;
+  const rescueArrow=mesh(root,cone,gold,0,.1,0,.35,.6,.25);rescueArrow.name="recovery-direction";rescueArrow.rotation.x=Math.PI/2;
   const drone=new THREE.Group();root.add(drone);
   mesh(drone,octahedron,cyan,0,1.1,0,.28,.2,.28);
   for(const side of [-1,1])mesh(drone,torus,gold,side*.35,1.1,0,.2,.2,.2).rotation.x=Math.PI/2;

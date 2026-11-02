@@ -19,3 +19,12 @@ The first six dash frames can parry an intersecting hostile projectile. A reflec
 ## Limits
 
 One rectangular combat arena, existing enemy families and three-phase boss remain. No copied humans, androids, arena layouts, soundtracks or commercial effects. This release adds tactical recovery and projectile timing, not the references' full campaigns or multiplayer.
+
+## Follow-up QA
+
+The recovery direction cone had a reversed north/south component. Its fixed
+rotation now agrees with the centerward position and points toward extraction
+from every quadrant. A rendered-scene transform test checks five positions,
+visibility after cargo removal and disposal. The shared objective strip now
+exposes recovery countdown and mission feedback; see `SHARED_HUD_QA.md` for
+desktop/touch browser evidence.

@@ -19,3 +19,11 @@ Split gates offer a left-side 300-point drift-banking contract or a right-side f
 ## Limits
 
 Original procedural cars/scenery/signs only. No licensed vehicles, copied courses or music; no open world, demolition system or online multiplayer. Route gates change objectives within this expressway, not the road topology.
+
+## Follow-up QA
+
+Contract settlement now checks expiry before success: a fifth clean pass on the
+deadline earns the contract, while the same pass one tick late earns only its
+normal pass score. A boundary regression exercises actual pass detection.
+Shared HUD integration exposes slipstream and contract data; see
+`SHARED_HUD_QA.md` for desktop/touch browser evidence.

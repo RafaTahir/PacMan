@@ -321,3 +321,19 @@ describe("Neon Rally slipstream and route contracts", () => {
     s.nextGateTick=s.tick;sim.step(input());expect(s.gateDistance).not.toBeNull();
   });
 });
+
+
+describe("Rally contract deadline", () => {
+  it.each([0, 1])("checks a real fifth pass %i tick(s) after the deadline", late => {
+    const sim = clearRoad(), s = sim.state;
+    s.tick = 99 + late;
+    s.contract = { kind: "overtake", baseline: 0, deadline: 100 };
+    s.overtakes = 4;
+    s.entities = [makeEntity(900, "sedan", 4, -5)];
+    sim.step(input());
+    expect(s.overtakes).toBe(5);
+    expect(s.contracts).toBe(late ? 0 : 1);
+    expect(s.contract).toBeNull();
+    expect(s.callout?.label).toBe(late ? "CONTRACT MISSED" : "CONTRACT COMPLETE");
+  });
+});

@@ -21,3 +21,11 @@ Three consecutive center returns activate five seconds of overdrive, adding one 
 ## Limits
 
 The three existing sectors and power-up families remain. No commercial boss set, story campaign, recordings or assets were copied. Tether steering is an original bounded adaptation, not Shatter's complete physics or feature set. Browser graphics acceptance remains part of the final pass.
+
+## Follow-up QA
+
+Instructions now accurately describe extra tower damage: overdrive adds one
+damage to each contact, including armed pulses, rather than doubling a pulse.
+A regression verifies a four-damage pulse plus overdrive removes five of eight
+armored HP. Precision/overdrive state is now visible in the shared objective
+strip; see `SHARED_HUD_QA.md` for desktop/touch browser evidence.

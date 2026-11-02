@@ -320,3 +320,15 @@ describe('Reactor flux and precision mastery',()=>{
     expect(s.precision).toBe(0);expect(s.overdriveTicks).toBe(0);
   });
 });
+
+
+it("adds one overdrive damage to an armed pulse instead of promising a doubled pulse", () => {
+  const sim = isolated(), s = sim.state;
+  s.towers[0] = tower(0, 0, 0, "armored", 4);
+  s.pulseArmed = 100; s.pulseStrength = 2; s.overdriveTicks = 100;
+  s.balls = [ball(0, 1.05, 0, -30)];
+  sim.step(NEUTRAL_INPUT);
+  // Four pulse damage plus one overdrive damage removes five of eight HP.
+  expect(s.towers[0]).toMatchObject({ layers: 2, hp: 1 });
+  expect(s.pulseArmed).toBe(0);
+});

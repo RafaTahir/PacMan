@@ -252,11 +252,13 @@ export class RallySimulation implements ArcadeSimulation<RallyState> {
       }
     }
     if(!s.contract)return;
-    const c=s.contract, progress=(c.kind==="drift"?s.driftScore:s.overtakes)-c.baseline;
+    const c=s.contract;
+    if(s.tick>c.deadline){this.announce("CONTRACT MISSED",0,100);s.contract=null;return;}
+    const progress=(c.kind==="drift"?s.driftScore:s.overtakes)-c.baseline;
     if(progress >= (c.kind==="drift"?300:5)){
       s.contracts++;this.addScore(1500);s.player.health=Math.min(100,s.player.health+10);
       this.announce("CONTRACT COMPLETE",1500,150);signals.push({type:"upgrade",value:1500});s.contract=null;
-    }else if(s.tick>c.deadline){this.announce("CONTRACT MISSED",0,100);s.contract=null;}
+    }
   }
 
   private movePlayer(input: Readonly<ArcadeInput>, signals: GameSignal[]): void {

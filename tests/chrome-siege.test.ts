@@ -228,3 +228,25 @@ describe('Chrome recovery and dash parry',()=>{
     for(let i=0;i<45;i++)sim.step(NEUTRAL_INPUT);expect(s.rescue?.carried).toBe(true);
   });
 });
+
+
+it("points the recovery arrow toward center from every arena quadrant", () => {
+  const sim = createSimulation(1), scene = new THREE.Scene(), camera = new THREE.OrthographicCamera();
+  const view = createView({ scene, camera, width: 960, height: 600, renderer: {} as THREE.WebGLRenderer }, sim);
+  const arrow = scene.getObjectByName("recovery-direction")!;
+  expect(arrow).toBeDefined();
+  for (const [x, y] of [[0, 3], [0, -3], [3, 0], [-3, 0], [5, -4]]) {
+    sim.state.player.x = x; sim.state.player.y = y;
+    sim.state.rescue = { x, y, expires: 900, carried: true, pickupAfter: 0 };
+    view.update(0, { highContrast: false, reducedMotion: true });
+    scene.updateMatrixWorld(true);
+    const tipDirection = new THREE.Vector3(0, 1, 0).transformDirection(arrow.matrixWorld);
+    const toCenter = new THREE.Vector3(-x, 0, -y).normalize();
+    expect(tipDirection.dot(toCenter)).toBeCloseTo(1);
+    expect(arrow.visible).toBe(true);
+  }
+  sim.state.rescue = null;
+  view.update(0, { highContrast: false, reducedMotion: true });
+  expect(arrow.visible).toBe(false);
+  view.dispose(); expect(scene.children).toHaveLength(0);
+});
