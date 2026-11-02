@@ -15,6 +15,7 @@ export type DropKind = "wide" | "multiball" | "shield";
 export interface Drop { id: number; x: number; y: number; kind: DropKind; age: number }
 export interface Burst { x: number; y: number; radius: number; life: number; maxLife: number; color: number }
 export interface ReactorState extends ArcadeState {
+  flux: number; tethering: boolean; precision: number; perfectReturns: number; overdriveTicks: number;
   stage: number; lives: number; towers: Tower[]; balls: Ball[]; particles: Particle[]; drops: Drop[]; bursts: Burst[];
   paddle: { x: number; prevX: number; velocity: number; halfWidth: number };
   energy: number; pulseCharge: number; pulseArmed: number; pulseStrength: number; shield: number; wideTicks: number;
@@ -76,6 +77,7 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
   let nextBallId = 1, nextDropId = 1, secondaryWasDown = false, secondaryLatched = false;
   let signals: GameSignal[] = [];
   const state: ReactorState = {
+    flux: 100, tethering: false, precision: 0, perfectReturns: 0, overdriveTicks: 0,
     seed: seed >>> 0, tick: 0, score: 0, status: "playing", stage: 1, lives: 3, towers: [], balls: [], particles: [], drops: [], bursts: [],
     paddle: { x: 0, prevX: 0, velocity: 0, halfWidth: BOARD.paddleHalfWidth }, energy: 45, pulseCharge: 0, pulseArmed: 0, pulseStrength: 0,
     shield: 1, wideTicks: 0, combo: 0, comboTicks: 0, layersBroken: 0, stageClearTicks: 0, serveTicks: 0, message: "LAUNCH INTO THE CORE",
@@ -109,7 +111,7 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
     state.drops = [];
     state.pulseArmed = 0;
     state.pulseStrength = 0;
-    state.serveTicks = 24;
+    state.serveTicks = 24; state.precision=0; state.overdriveTicks=0; state.flux=100;
     state.message = state.stage === 1 ? "LAUNCH INTO THE CORE" : `SECTOR ${state.stage} · LAUNCH`;
   };
   const spawnDrop = (tower: Tower) => {
@@ -130,6 +132,7 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
         tower.hp = tower.layers > 0 ? tower.layerHp : 0;
         broken++;
         state.layersBroken++;
+        state.flux=Math.min(100,state.flux+4);
         state.combo = Math.min(12, state.combo + 1);
         state.comboTicks = 210;
         state.energy = Math.min(100, state.energy + 3);
@@ -220,6 +223,12 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
         ball.vy = -Math.sqrt(velocity * velocity - ball.vx * ball.vx);
         ball.y = Math.min(ball.y, BOARD.paddleY - 0.16 - ball.radius - EPS * 10);
         particles(ball.x, ball.y, 0x8affec, 4, 0.55);
+        if(Math.abs(impact)<.2){
+          state.perfectReturns++;state.precision++;
+          addScore(75*state.precision);emit("chain",state.precision);
+          if(state.precision>=3){state.overdriveTicks=300;state.precision=0;state.message="PRECISION OVERDRIVE · 5 SECONDS";emit("upgrade");}
+          else state.message=`PRECISION ${state.precision}/3 · CENTER THE RETURN`;
+        }else state.precision=0;
         emit("bounce", Math.abs(impact));
       } else {
         const dot = ball.vx * contact.nx + ball.vy * contact.ny;
@@ -232,7 +241,7 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
           emit("near-miss");
         } else if (object !== "wall") {
           const armed = state.pulseArmed > 0;
-          hitTower(object, armed ? 2 + state.pulseStrength : 1, armed ? state.pulseStrength === 2 ? 3.65 : 2.55 : 0);
+          hitTower(object, (armed ? 2 + state.pulseStrength : 1) + (state.overdriveTicks>0?1:0), armed ? state.pulseStrength === 2 ? 3.65 : 2.55 : 0);
           if (armed) { state.pulseArmed = 0; state.pulseStrength = 0; }
           // A vertical component prevents an indefinitely horizontal orbit.
           const velocity = Math.hypot(ball.vx, ball.vy);
@@ -282,6 +291,9 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
       state.paddle.x = clamp(state.paddle.x, -paddleLimit, paddleLimit);
       state.paddle.velocity = (state.paddle.x - state.paddle.prevX) / DT;
       state.energy = Math.min(100, state.energy + 0.035);
+      state.overdriveTicks=Math.max(0,state.overdriveTicks-1);
+      state.tethering=!!(buttons & Buttons.PRIMARY) && state.flux>=.4 && state.balls.some(b=>b.vy>0 && b.y>0 && b.y<BOARD.paddleY);
+      state.flux=clamp(state.flux+(state.tethering?-.4:.12),0,100);
       if (state.wideTicks > 0) state.wideTicks--;
       if (state.pulseArmed > 0 && --state.pulseArmed === 0) state.pulseStrength = 0;
       if (state.comboTicks > 0 && --state.comboTicks === 0) state.combo = 0;
@@ -313,12 +325,19 @@ export function createSimulation(seed: number): ArcadeSimulation<ReactorState> {
       } else {
         if (state.serveTicks > 0) state.serveTicks--;
         if (state.balls.length === 0 && state.serveTicks === 0 && buttons & (Buttons.PRIMARY | Buttons.LAUNCH)) launch(horizontal);
-        for (const ball of state.balls) advanceBall(ball);
+        for (const ball of state.balls) {
+          if(state.tethering && ball.vy>0 && ball.y>0 && ball.y<BOARD.paddleY){
+            const velocity=Math.hypot(ball.vx,ball.vy);
+            ball.vx=clamp(ball.vx+clamp(state.paddle.x-ball.x,-4,4)*3*DT,-velocity*.8,velocity*.8);
+            ball.vy=Math.sqrt(Math.max(0,velocity*velocity-ball.vx*ball.vx));
+          }
+          advanceBall(ball);
+        }
         const before = state.balls.length;
         state.balls = state.balls.filter(ball => ball.y < BOARD.bottom + 0.9);
         if (before > 0 && state.balls.length === 0) {
           state.lives--;
-          state.combo = 0; state.comboTicks = 0;
+          state.combo = 0; state.comboTicks = 0; state.precision=0; state.overdriveTicks=0;
           state.serveTicks = 45;
           state.pulseArmed = 0; state.pulseStrength = 0;
           state.message = state.lives > 0 ? "CORE LOST · LAUNCH AGAIN" : "REACTOR OFFLINE";

@@ -250,7 +250,7 @@ describe("reactor replay integrity and resource limits", () => {
       const drop = state.drops.filter(drop => drop.y > 4 && drop.y < 8.5).sort((a, b) => b.y - a.y)[0];
       if (drop && (!lead || lead.y < 4)) target = drop.x;
       const aimX = Math.round(Math.max(-127, Math.min(127, target / 6.49 * 127)));
-      simulation.step(input({ aimX, buttons: Buttons.PRIMARY | Buttons.POINTER | (tick % 120 < 60 ? Buttons.SECONDARY : 0) }));
+      simulation.step(input({ aimX, buttons: Buttons.LAUNCH | Buttons.POINTER | (tick % 120 < 60 ? Buttons.SECONDARY : 0) }));
     }
     expect([...sectors]).toEqual([1, 2, 3]);
     expect(simulation.state.status).toBe("victory");
@@ -295,5 +295,28 @@ describe("reactor replay integrity and resource limits", () => {
     expect(simulation.state.particles.length).toBeLessThanOrEqual(LIMITS.particles);
     expect(simulation.state.bursts.length).toBeLessThanOrEqual(LIMITS.bursts);
     expect(signals.length).toBeLessThanOrEqual(32);
+  });
+});
+
+describe('Reactor flux and precision mastery',()=>{
+  it('tethers descending balls with bounded speed and resource cost, leaving upward balls alone',()=>{
+    const sim=isolated();const s=sim.state;s.paddle.x=3;s.balls=[ball(0,4,0,10),ball(0,3,0,-10,2)];
+    sim.step(input({buttons:Buttons.PRIMARY}));
+    expect(s.tethering).toBe(true);expect(s.flux).toBeCloseTo(99.6);expect(s.balls[0].vx).toBeGreaterThan(0);
+    expect(Math.hypot(s.balls[0].vx,s.balls[0].vy)).toBeCloseTo(10);expect(s.balls[1].vx).toBe(0);
+    s.flux=0;sim.step(input({buttons:Buttons.PRIMARY}));expect(s.tethering).toBe(false);
+  });
+  it('requires consecutive center returns and awards bounded five-second overdrive',()=>{
+    const sim=isolated();const s=sim.state;
+    for(let i=0;i<3;i++){s.balls=[ball(0,7.9,0,12)];sim.step(NEUTRAL_INPUT);}
+    expect(s.perfectReturns).toBe(3);expect(s.precision).toBe(0);expect(s.overdriveTicks).toBe(300);
+    s.towers[0]=tower(0,0,0,'core',3);s.balls=[ball(0,1.05,0,-30)];sim.step(NEUTRAL_INPUT);
+    expect(s.towers[0].layers).toBe(1);
+    s.balls=[];for(let i=0;i<299;i++)sim.step(NEUTRAL_INPUT);expect(s.overdriveTicks).toBe(0);
+  });
+  it('off-center returns and a drain reset unfinished precision chains',()=>{
+    const sim=isolated();const s=sim.state;s.precision=2;s.balls=[ball(1.1,7.9,0,12)];sim.step(NEUTRAL_INPUT);expect(s.precision).toBe(0);
+    s.precision=2;s.overdriveTicks=90;s.balls=[ball(5,11,0,15)];sim.step(NEUTRAL_INPUT);
+    expect(s.precision).toBe(0);expect(s.overdriveTicks).toBe(0);
   });
 });

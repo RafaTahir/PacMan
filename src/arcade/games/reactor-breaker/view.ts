@@ -114,6 +114,16 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
     group.add(core, ring, bar);
     return { group, core, ring, bar, surface };
   });
+  const fluxMaterial=material(new THREE.MeshBasicMaterial({color:0x9fe8ff,transparent:true,opacity:.5,depthWrite:false}));
+  const fluxBeams=Array.from({length:LIMITS.balls},()=>mesh(box(.04,.04,1),fluxMaterial));
+  const precisionPips=Array.from({length:3},(_,i)=>mesh(geometry(new THREE.OctahedronGeometry(.14)),basic(0xffd589),i*.5-.5,.52,BOARD.paddleY));
+  const rotor=add(new THREE.Group());
+  const reactorMetal=standard(0x253c50,.7,.3), reactorGlow=basic(0x78e5da);
+  for(let i=0;i<8;i++){
+    const blade=new THREE.Mesh(box(.45,.18,1.8),reactorMetal);blade.position.set(Math.cos(i*Math.PI/4)*1.6,.12,Math.sin(i*Math.PI/4)*1.6);blade.rotation.y=-i*Math.PI/4;rotor.add(blade);
+  }
+  rotor.position.set(0,.03,3.5);
+  const reactorRing=mesh(geometry(new THREE.TorusGeometry(2.7,.035,5,48)),reactorGlow,0,.03,3.5);reactorRing.rotation.x=-Math.PI/2;
   const raycaster = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), aimPoint = new THREE.Vector3();
   let lastStage = -1, lastContrast = false, disposed = false;
 
@@ -141,7 +151,7 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
     context.font = "600 13px ui-monospace, monospace"; context.fillText("AFTER HOURS  //  CONTAINMENT ARRAY", 51, 96);
     context.textAlign = "right"; context.fillText("SHIFT: 02:00", w - 50, 72);
     context.font = "600 13px ui-monospace, monospace"; context.fillStyle = highContrast ? "#a7bec6" : "#3d5c69"; context.textAlign = "center";
-    context.fillText("RETURN CORRIDOR", w / 2, h * 0.69);
+    context.fillText("HOLD LAUNCH: FLUX TETHER  /  3 CENTER RETURNS: OVERDRIVE", w / 2, h * 0.69);
     context.font = "700 12px ui-monospace, monospace"; context.fillText("FIELD CATCH / CAPACITOR RESERVE", w / 2, h - 24);
     context.fillStyle = highContrast ? "#ad8541" : "#655737";
     for (let x = 30; x < w - 35; x += 30) { context.beginPath(); context.moveTo(x, 10); context.lineTo(x + 12, 10); context.lineTo(x + 2, 22); context.lineTo(x - 10, 22); context.closePath(); context.fill(); }
@@ -159,6 +169,13 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
 
   function update(alpha: number, options: VisualOptions) {
     if (disposed) return;
+    rotor.rotation.y=options.reducedMotion?0:state.tick*(state.overdriveTicks?.015:.003);
+    reactorGlow.color.setHex(state.overdriveTicks?0xffdb8b:0x327d85);
+    precisionPips.forEach((pip,i)=>{pip.position.x=state.paddle.x+i*.5-.5;pip.visible=i<state.precision||state.overdriveTicks>0;});
+    fluxBeams.forEach((beam,i)=>{
+      const b=state.balls[i];beam.visible=!!b&&state.tethering&&b.vy>0&&b.y>0;
+      if(b){const dx=b.x-state.paddle.x,dz=b.y-BOARD.paddleY;beam.position.set((b.x+state.paddle.x)/2,.22,(b.y+BOARD.paddleY)/2);beam.scale.z=Math.hypot(dx,dz);beam.rotation.y=Math.atan2(dx,dz);}
+    });
     const interpolation = clamp(alpha, 0, 1), palette = options.highContrast ? CONTRAST : COLORS;
     if (lastStage !== state.stage || lastContrast !== options.highContrast) { drawFloor(options.highContrast); lastStage = state.stage; lastContrast = options.highContrast; }
     railGlow.color.setHex(options.highContrast ? 0x58c7cb : 0x23888e);
