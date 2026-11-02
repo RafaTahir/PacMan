@@ -24,6 +24,8 @@ export interface Bullet {
 export interface Pickup { id: number; x: number; y: number; kind: "core" | "repair"; value: number; ttl: number }
 export interface Effect { id: number; x: number; y: number; kind: "kill" | "hurt" | "dash" | "upgrade"; ttl: number; maxTtl: number }
 export interface SiegeState extends ArcadeState {
+  rescue: { x:number; y:number; expires:number; carried:boolean; pickupAfter:number } | null;
+  rescued:number; supportTicks:number; parries:number; message:string; messageUntil:number;
   player: Player; enemies: Enemy[]; bullets: Bullet[]; pickups: Pickup[]; effects: Effect[];
   wave: number; combo: number; comboTicks: number; bestCombo: number; bossSpawned: boolean;
   bossDefeated: boolean; waveBanner: number; spawnCountdown: number;
@@ -46,6 +48,7 @@ export function createSimulation(seed: number): ArcadeSimulation<SiegeState> {
   let secondaryDown = false;
   let events: GameSignal[] = [];
   const state: SiegeState = {
+    rescue:null,rescued:0,supportTicks:0,parries:0,message:"RECOVER GOLD PODS → CENTER PAD",messageUntil:300,
     seed: seed >>> 0, tick: 0, score: 0, status: "playing", wave: 1, combo: 0, comboTicks: 0,
     bestCombo: 0, bossSpawned: false, bossDefeated: false, waveBanner: 180, spawnCountdown: 75,
     player: { x: 0, y: 3, aimX: 0, aimY: -1, hp: 6, maxHp: 6, invulnerable: 60,
@@ -100,6 +103,7 @@ export function createSimulation(seed: number): ArcadeSimulation<SiegeState> {
     if (p.invulnerable > 0 || p.dashTicks > 0 || state.status !== "playing") return;
     p.hp = Math.max(0, p.hp - damage); p.invulnerable = 84;
     state.combo = 0; state.comboTicks = 0;
+    if(state.rescue?.carried){state.rescue.carried=false;state.rescue.x=p.x;state.rescue.y=p.y;state.rescue.pickupAfter=state.tick+45;state.message="CARGO DROPPED · RECOVER IT";state.messageUntil=state.tick+150;}
     effect(p.x, p.y, "hurt", 36); signal("hit", damage);
     if (p.hp === 0) { state.status = "gameover"; signal("death"); signal("lose"); }
   }
@@ -215,7 +219,11 @@ export function createSimulation(seed: number): ArcadeSimulation<SiegeState> {
       let consumed = bullet.ttl <= 0 || Math.abs(nx) > 12.7 || Math.abs(ny) > 9.7;
       if (!consumed && bullet.hostile) {
         if (segmentHits(bullet.x, bullet.y, nx, ny, p.x, p.y, PLAYER_RADIUS + bullet.radius)) {
-          damagePlayer(bullet.damage); consumed = true;
+          if(p.dashTicks>=DASH_DURATION-6 && state.bullets.filter(b=>!b.hostile).length<LIMITS.playerShots){
+            bullet.hostile=false;bullet.vx=-bullet.vx*2.2;bullet.vy=-bullet.vy*2.2;bullet.damage=18;bullet.ttl=100;
+            bullet.x=nx;bullet.y=ny;state.parries++;score(25);signal("chain",state.parries);
+            state.message="DASH PARRY · RETURN TO SENDER";state.messageUntil=state.tick+90;
+          }else{damagePlayer(bullet.damage); consumed = true;}
         }
       } else if (!consumed) {
         for (const enemy of state.enemies) {
@@ -247,6 +255,33 @@ export function createSimulation(seed: number): ArcadeSimulation<SiegeState> {
       }
       return item.ttl > 0;
     });
+  }
+  function updateRescue() {
+    if(state.tick%1200===600 && !state.rescue){
+      const side=((state.seed+Math.floor(state.tick/1200))%4);
+      state.rescue={x:side<2?(side===0?-9:9):0,y:side<2?0:side===2?-7:7,expires:state.tick+900,carried:false,pickupAfter:0};
+      state.message="RECOVERY POD · RETURN IT TO CENTER";state.messageUntil=state.tick+180;
+    }
+    const rescue=state.rescue;
+    if(rescue){
+      if(state.tick>rescue.expires){state.rescue=null;state.message="POD SIGNAL LOST";state.messageUntil=state.tick+120;}
+      else if(rescue.carried){
+        rescue.x=p.x;rescue.y=p.y;
+        if(near(p.x,p.y,0,0,1.35)){
+          state.rescued++;state.supportTicks=720;score(1000+state.wave*100);p.hp=Math.min(p.maxHp,p.hp+1);
+          effect(0,0,"upgrade",60);signal("upgrade");state.rescue=null;state.message="RECOVERED · SUPPORT DRONE 12s";state.messageUntil=state.tick+180;
+        }
+      }else if(state.tick>=rescue.pickupAfter && near(p.x,p.y,rescue.x,rescue.y,.8)){
+        rescue.carried=true;state.message="CARGO SECURED · CENTER PAD";state.messageUntil=state.tick+180;
+      }
+    }
+    if(state.supportTicks>0){
+      state.supportTicks--;
+      if(state.tick%24===0){
+        const target=state.enemies.filter(e=>e.spawnTicks===0&&e.hp>0).sort((a,b)=>(a.x-p.x)**2+(a.y-p.y)**2-((b.x-p.x)**2+(b.y-p.y)**2)||a.id-b.id)[0];
+        if(target)shoot(p.x,p.y,Math.atan2(target.y-p.y,target.x-p.x),.38,false,10,.15);
+      }
+    }
   }
   function step(input: Readonly<ArcadeInput>): readonly GameSignal[] {
     events = [];
@@ -299,6 +334,7 @@ export function createSimulation(seed: number): ArcadeSimulation<SiegeState> {
     updateEnemies();
     if (state.status === "playing") updateBullets();
     if (state.status === "playing") updatePickups();
+    if (state.status === "playing") updateRescue();
     state.effects = state.effects.filter(e => --e.ttl > 0);
     if (state.tick >= MAX_TICKS && state.status === "playing") { state.status = "gameover"; signal("lose"); }
     return events;

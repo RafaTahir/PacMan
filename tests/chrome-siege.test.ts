@@ -200,3 +200,31 @@ describe("Chrome Siege deterministic combat", () => {
     view.dispose(); expect(scene.children).toHaveLength(0);
   });
 });
+
+describe('Chrome recovery and dash parry',()=>{
+  it('schedules a seeded pod, carries it to center and pays only once',()=>{
+    const sim=createSimulation(4),s=sim.state;s.tick=599;s.spawnCountdown=9999;sim.step(NEUTRAL_INPUT);
+    expect(s.rescue).toMatchObject({x:-9,y:0,carried:false});
+    s.player.x=-9;s.player.y=0;sim.step(NEUTRAL_INPUT);expect(s.rescue?.carried).toBe(true);
+    s.player.x=0;sim.step(NEUTRAL_INPUT);expect(s.rescued).toBe(1);expect(s.supportTicks).toBe(719);expect(s.rescue).toBeNull();
+    const score=s.score;sim.step(NEUTRAL_INPUT);expect(s.score).toBe(score);
+  });
+  it('expires rescue opportunities without awarding support and keeps support finite',()=>{
+    const sim=createSimulation(1),s=sim.state;s.rescue={x:9,y:0,expires:0,carried:false,pickupAfter:0};
+    sim.step(NEUTRAL_INPUT);expect(s.rescue).toBeNull();expect(s.rescued).toBe(0);
+    s.supportTicks=1;sim.step(NEUTRAL_INPUT);expect(s.supportTicks).toBe(0);
+  });
+  it('reflects a contact during early dash frames, with fixed damage and one award',()=>{
+    const sim=createSimulation(1),s=sim.state,p=s.player;p.invulnerable=0;p.dashTicks=15;p.dashX=0;p.dashY=0;
+    s.bullets=[{id:900,x:p.x,y:p.y,vx:0,vy:.1,radius:.15,damage:1,ttl:50,hostile:true}];
+    sim.step(NEUTRAL_INPUT);expect(s.parries).toBe(1);expect(p.hp).toBe(6);expect(s.bullets[0]).toMatchObject({hostile:false,damage:18});
+    expect(s.bullets[0].vy).toBeLessThan(0);sim.step(NEUTRAL_INPUT);expect(s.parries).toBe(1);
+  });
+  it('drops carried cargo on damage with a real recovery delay',()=>{
+    const sim=createSimulation(1),s=sim.state,p=s.player;p.invulnerable=0;p.x=6;p.y=0;
+    s.rescue={x:6,y:0,expires:1000,carried:true,pickupAfter:0};
+    s.bullets=[{id:900,x:6,y:0,vx:0,vy:.1,radius:.15,damage:1,ttl:50,hostile:true}];
+    sim.step(NEUTRAL_INPUT);expect(s.rescue?.carried).toBe(false);expect(s.rescue!.pickupAfter).toBe(46);
+    for(let i=0;i<45;i++)sim.step(NEUTRAL_INPUT);expect(s.rescue?.carried).toBe(true);
+  });
+});

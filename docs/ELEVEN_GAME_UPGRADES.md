@@ -7,7 +7,7 @@ Starting source: `62b622a80b994ebc27ecde33e21ebf3087275950`, tree `9875391b03df4
 | 1 | PAC-MAN | Implemented; model/type checks pass | [Research and acceptance](upgrades/01-pacman.md) |
 | 2 | Neon Rally | Implemented; 18 model tests/type checks pass | [Research and acceptance](upgrades/02-neon-rally.md) |
 | 3 | Reactor Breaker | Implemented; 24 model tests/type checks pass | [Research and acceptance](upgrades/03-reactor-breaker.md) |
-| 4 | Chrome Siege | Pending | — |
+| 4 | Chrome Siege | Implemented; 14 model/view tests/type checks pass | [Research and acceptance](upgrades/04-chrome-siege.md) |
 | 5 | Midnight Pinball | Pending | — |
 | 6 | Orbit Salvage | Pending | — |
 | 7 | Tidal Courier | Pending | — |

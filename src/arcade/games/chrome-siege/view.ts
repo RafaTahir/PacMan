@@ -114,6 +114,16 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
   const shadowMaterial = material(new THREE.MeshBasicMaterial({ color: 0x000407, transparent: true, opacity: .48, depthWrite: false }));
   const shadowGeometry = geometry(new THREE.CircleGeometry(1, 24));
   const playerShadow = mesh(root, shadowGeometry, shadowMaterial, 0, .005, 0, .75, 1, 1); playerShadow.rotation.x = -Math.PI / 2;
+  const rescuePod=new THREE.Group();root.add(rescuePod);
+  mesh(rescuePod,box,hull,0,.45,0,.75,.55,.65);
+  mesh(rescuePod,box,gold,0,.76,0,.55,.08,.48);
+  for(const x of [-.2,.2])mesh(rescuePod,sphere,white,x,.5,-.34,.07,.07,.05);
+  flatRing(rescuePod,gold,.95);
+  const rescueArrow=mesh(root,cone,gold,0,.1,0,.35,.6,.25);rescueArrow.rotation.x=-Math.PI/2;
+  const drone=new THREE.Group();root.add(drone);
+  mesh(drone,octahedron,cyan,0,1.1,0,.28,.2,.28);
+  for(const side of [-1,1])mesh(drone,torus,gold,side*.35,1.1,0,.2,.2,.2).rotation.x=Math.PI/2;
+  const parryHalo=flatRing(player,gold,1.15,.08);
   const enemyActors = new Map<number, Actor>();
   const bullets = new Map<number, THREE.Mesh>();
   const pickups = new Map<number, THREE.Group>();
@@ -208,6 +218,14 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
     aimMarker.position.set(p.x + p.aimX * 1.5, .1, p.y + p.aimY * 1.5);
     aimMarker.rotation.z = 0; aimMarker.rotation.y = angle;
     playerShadow.position.set(p.x, .005, p.y);
+    parryHalo.visible=p.dashTicks>=10;
+    rescuePod.visible=!!state.rescue;
+    if(state.rescue){rescuePod.position.set(state.rescue.x,state.rescue.carried?1:0,state.rescue.y);rescuePod.scale.setScalar(state.rescue.carried?.65:1);}
+    rescueArrow.visible=!!state.rescue?.carried;
+    if(state.rescue?.carried){const angle=Math.atan2(-p.x,-p.y);rescueArrow.position.set(p.x+Math.sin(angle)*1.4,.12,p.y+Math.cos(angle)*1.4);rescueArrow.rotation.z=-angle;}
+    drone.visible=state.supportTicks>0;drone.position.set(p.x+1.2,p.dashTicks?.3:0,p.y);
+    drone.rotation.y=options.reducedMotion?0:t;
+    pad.children.forEach(child=>{if(child instanceof THREE.Mesh)child.material=state.rescue?.carried?gold:dim;});
     const liveEnemies = new Set<number>();
     for (const enemy of state.enemies) {
       liveEnemies.add(enemy.id);
@@ -248,6 +266,7 @@ export function createView(stage: ThreeStage, simulation: ArcadeSimulation): Arc
         actor = mesh(root, bullet.hostile ? sphere : box, bullet.hostile ? pink : cyan, 0, .4, 0, 1, 1, 1);
         bullets.set(bullet.id, actor);
       }
+      actor.material=bullet.hostile?pink:cyan; actor.geometry=bullet.hostile?sphere:box;
       actor.position.set(bullet.x, bullet.hostile ? .48 : .7, bullet.y);
       if (bullet.hostile) actor.scale.setScalar(bullet.radius * (options.highContrast ? 1.25 : 1));
       else { actor.scale.set(.09, .09, .42); actor.rotation.y = Math.atan2(bullet.vx, bullet.vy); }
