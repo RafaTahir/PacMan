@@ -5,6 +5,7 @@ import { cabinets } from "./catalog";
 import { ArcadeController, type FinishedRun } from "./controller";
 import { ArcadeSound } from "./audio";
 import { Leaderboard } from "./leaderboard";
+import { partitionHud } from "./hud";
 import { supportsWebGL2 } from "./capabilities";
 import type { Showroom } from "./showroom";
 import { PacmanAdapter } from "./pacman-adapter";
@@ -83,7 +84,7 @@ function showOverlay(phase: string, title: string, copy: string, countdown = 0) 
   $("countdown-number").textContent = String(countdown);
   $("play-start-button").hidden = !["intro", "ended"].includes(phase);
   $("play-practice-button").hidden = !["intro", "ended", "unavailable"].includes(phase);
-  $("play-practice-button").textContent = phase === "unavailable" ? "Try Pac-Man" : selected === "pacman" ? "Classic local play" : "Local practice";
+  $("play-practice-button").textContent = phase === "unavailable" ? "Try Pac-Man" : selected === "pacman" ? "Local Circuit Relay" : "Local practice";
   $("play-resume-button").hidden = phase !== "paused";
   $("play-keep-paused").hidden = phase !== "countdown";
   $<HTMLButtonElement>("play-pause-button").disabled = !["playing", "paused", "countdown", "ready"].includes(phase);
@@ -111,19 +112,21 @@ function updateMode() {
 function updateHud(definition: GameDefinition, simulation: ArcadeSimulation) {
   const score = simulation.state.score;
   if (score > localBest(definition.id)) saveBest(definition.id, score);
-  const all = definition.hud(simulation);
-  const important = all.filter(item => item.kind);
-  const extra = (important.length ? important : all).slice(0, 3);
-  if (definition.id === "midnight-pinball") {
-    const tour = all.find(item => item.label === "ISLAND TOUR");
-    const table = all.find(item => item.label === "TILT" || item.label === "TABLE");
-    const feedback = all.find(item => item.label === "NIGHT SHIFT");
-    $("play-objective").textContent = table?.label === "TILT" ? "TILT · flippers disabled until the next ball."
-      : `3 stars → left ramp: multiball. Ramp + river: Island Tour. ${tour?.value ?? ""} · ${feedback?.value ?? ""}`;
-  }
+  const { primary: extra, details } = partitionHud(definition.hud(simulation));
   const seconds = Math.max(0, Math.ceil((MAX_TICKS - simulation.state.tick) / TICK_RATE));
-  const signature = `${score}:${seconds}:${extra.map(item => `${item.label}:${item.value}`).join("|")}`;
+  const signature = JSON.stringify([score, seconds, extra, details]);
   if (signature === hudSignature) return; hudSignature = signature;
+  const objective = $("play-objective");
+  objective.hidden = details.length === 0;
+  objective.setAttribute("role", "region");
+  objective.setAttribute("aria-label", "Game objectives and additional status. Scroll for more when needed.");
+  objective.tabIndex = 0;
+  objective.replaceChildren(...details.map(item => {
+    const detail = document.createElement("span"); detail.className = "hud-detail";
+    const label = document.createElement("strong"); label.textContent = `${item.label}: `;
+    detail.append(label, document.createTextNode(item.value));
+    return detail;
+  }));
   $("hud-score").textContent = score.toLocaleString(); $("hud-time").textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   $("hud-extras").replaceChildren(...extra.map(item => {
     const element = document.createElement("div"); element.className = `hud-item ${item.kind ?? ""}`;
@@ -140,8 +143,8 @@ function releaseGame() {
 async function launch(id: GameId) {
   releaseGame(); disposeShowroom();
   selected = id; const version = revision;
-  $("play-objective").hidden = id !== "midnight-pinball";
-  $("play-objective").textContent = id === "midnight-pinball" ? "3 stars → left ramp: multiball. Left ramp + right river: Island Tour." : "";
+  $("play-objective").hidden = true;
+  $("play-objective").replaceChildren();
   $("score-save-status").textContent = "Choose ranked for global scores, or practice for a local best.";
   $("arcade-home").hidden = true; $("arcade-play").hidden = false;
   const cabinet = cabinets.find(item => item.id === id)!;
